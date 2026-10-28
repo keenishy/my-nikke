@@ -138,10 +138,34 @@ function deckThumbs(deck = [], size = "") {
 }
 const deckButton = (deck) => (deck.length ? `<span class="dks">${deckThumbs(deck)}</span>` : "덱 선택");
 
+// 점수는 숫자만 쳐도 쉼표가 자동으로 붙고, 아래에 "316억 6509만"처럼 읽기 쉬운 값을 같이 보여 줌
+const scoreHint = (n) => (n >= 1e8 ? `${Math.floor(n / 1e8)}억${n % 1e8 >= 1e4 ? ` ${Math.floor((n % 1e8) / 1e4)}만` : ""}` : n >= 1e4 ? `${Math.floor(n / 1e4)}만` : "");
+
 function runRow(run = {}) {
     const deck = run.deck || [];
-    return `<div class="run" data-deck="${deck.join(",")}"><input class="score" inputmode="numeric" placeholder="점수" value="${run.score ? run.score.toLocaleString() : ""}"><input class="pctin" inputmode="decimal" placeholder="상위 %" value="${run.pct ?? ""}"><button type="button" class="btn small" data-delrun aria-label="회차 삭제">✕</button>
+    return `<div class="run" data-deck="${deck.join(",")}">
+        <div class="score-wrap"><input class="score" inputmode="numeric" autocomplete="off" placeholder="점수 (숫자만)" value="${run.score ? run.score.toLocaleString() : ""}"><span class="score-hint">${run.score ? scoreHint(run.score) : ""}</span></div>
+        <label class="pct-wrap"><span>상위</span><input class="pctin" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${run.pct ?? ""}"><span>%</span></label>
+        <button type="button" class="btn small" data-delrun aria-label="회차 삭제">✕</button>
         <button type="button" class="deck-btn" data-deckedit>${deckButton(deck)}</button></div>`;
+}
+
+// 입력하는 동안 점수에 쉼표를 넣고, 커서는 같은 숫자 뒤에 그대로 둠
+function formatScoreInput(el) {
+    const digitsBefore = el.value.slice(0, el.selectionStart).replace(/\D/g, "").length;
+    const n = parseScore(el.value);
+    el.value = n ? n.toLocaleString() : "";
+    let pos = 0;
+    for (let seen = 0; pos < el.value.length && seen < digitsBefore; pos++) if (/\d/.test(el.value[pos])) seen++;
+    el.setSelectionRange(pos, pos);
+    el.parentElement.querySelector(".score-hint").textContent = scoreHint(n);
+}
+
+// 상위 %는 숫자와 소수점 하나만 남김 ("1.72%"를 붙여 넣어도 1.72)
+function cleanPctInput(el) {
+    const [int, ...rest] = el.value.replace(/[^0-9.]/g, "").split(".");
+    const v = rest.length ? `${int}.${rest.join("")}` : int;
+    if (v !== el.value) el.value = v;
 }
 
 const readDeck = (row) => (row.dataset.deck ? row.dataset.deck.split(",").map(Number) : []);
@@ -327,8 +351,12 @@ export async function initRaid() {
         if (e.target.dataset.delrun !== undefined) {
             const runs = e.target.closest(".runs");
             if (runs.children.length > 1) e.target.closest(".run").remove();
-            else runs.querySelectorAll("input").forEach((i) => (i.value = ""));
+            else { runs.querySelectorAll("input").forEach((i) => (i.value = "")); runs.querySelector(".score-hint").textContent = ""; }
         }
+    });
+    $("#raid-accounts").addEventListener("input", (e) => {
+        if (e.target.classList.contains("score")) formatScoreInput(e.target);
+        if (e.target.classList.contains("pctin")) cleanPctInput(e.target);
     });
     $("#raid-delete").addEventListener("click", removeRaid);
     $("#deck-q").addEventListener("input", renderDeckPicker);

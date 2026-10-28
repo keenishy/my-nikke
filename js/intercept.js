@@ -368,6 +368,15 @@ async function setup() {
     $("#ic-accounts").addEventListener("input", touch);
     $("#ic-accounts").addEventListener("click", (e) => { if (e.target.closest("button, input, select")) touch(e); });
     $("#ic-all-boss").addEventListener("change", () => document.querySelectorAll("#ic-accounts .ic-acc").forEach((c) => { c.dataset.keep = "1"; c.classList.remove("untouched"); }));
+    // 미참여로 저장된 계정도 회차 칸은 항상 누를 수 있게 두고, 회차를 건드리면 미참여를 자동으로 풂
+    const unskip = (e) => {
+        const card = e.target.closest(".ic-acc.skipped");
+        if (!card || !e.target.closest(".ic-runs")) return;
+        card.querySelector(".skip").checked = false;
+        card.classList.remove("skipped");
+    };
+    $("#ic-accounts").addEventListener("click", (e) => { if (e.target.closest("button, input, select")) unskip(e); });
+    $("#ic-accounts").addEventListener("change", unskip);
     $("#ic-accounts").addEventListener("click", (e) => {
         const b = e.target.closest(".mods-pick button");
         if (b) { b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); }

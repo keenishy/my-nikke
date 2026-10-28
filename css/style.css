@@ -214,11 +214,19 @@ dialog.wide { width: min(1200px, calc(100vw - 24px)); }
 #raid-dialog select { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
 .form-grid .span2 { grid-column: span 2; }
-.raid-accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-top: 14px; }
+.raid-accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; margin-top: 14px; }
 .racc { background: var(--bg); border-radius: 10px; padding: 10px; }
 .racc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.run { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 6px; margin-bottom: 6px; }
+.run { display: grid; grid-template-columns: minmax(0, 1fr) 128px auto; gap: 6px; margin-bottom: 8px; align-items: start; }
 .racc input { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; min-width: 0; width: 100%; background: var(--card); }
+.racc input.score { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; padding: 7px 10px; }
+.score-wrap { min-width: 0; }
+.score-hint { display: block; min-height: 1em; font-size: 0.72rem; color: var(--muted); margin: 2px 0 0 4px; }
+.form .pct-wrap { display: flex; flex-direction: row; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); padding: 0 8px; height: 36px; font-size: 0.8rem; color: var(--muted); }
+.form .pct-wrap span { flex: none; white-space: nowrap; }
+.pct-wrap:focus-within { border-color: var(--primary); }
+.racc .pct-wrap input { border: none; padding: 0; background: none; text-align: right; font-size: 0.95rem; font-weight: 600; color: var(--text); outline: none; }
+.run > .btn { height: 36px; }
 @media (max-width: 640px) { .form-grid .span2 { grid-column: auto; } }
 
 /* 덱 */
@@ -276,7 +284,8 @@ td .dks { margin-top: 4px; }
 .ic-accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; max-height: 64vh; overflow: auto; }
 .ic-acc { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .ic-acc.is-fb { border-color: var(--pickup); }
-.ic-acc.skipped .ic-runs { opacity: 0.35; pointer-events: none; }
+.ic-acc.skipped .ic-runs { opacity: 0.45; }
+.ic-acc.skipped .ic-runs:hover { opacity: 0.8; }
 .ic-acc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ic-acc-head b { margin-right: auto; }
 .ic-acc-head label, .ic-run-head label { font-size: 0.8rem; display: flex; align-items: center; gap: 3px; }
