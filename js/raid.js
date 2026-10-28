@@ -44,18 +44,23 @@ function renderList() {
     const cols = accs();
     $("#raid-count").textContent = `${list.length}회`;
     if (!list.length) { $("#raid-view").innerHTML = `<p class="empty">기록이 없습니다. 「+ 새 기록」을 누르거나 「기존 기록 가져오기」를 눌러 주세요.</p>`; return; }
-    $("#raid-view").innerHTML = `<div class="table-wrap"><table class="raid-table">
-        <thead><tr><th class="sticky">${r.view === "solo" ? "시즌 / 보스" : "보스"}</th>${cols.map((a) => `<th>${esc(a)}</th>`).join("")}</tr></thead>
+    // 시즌(솔로만)·보스는 가로로 넘겨도 보이게 고정, 일정·메모는 계정 칸 오른쪽
+    const solo = r.view === "solo";
+    const elOf = (x) => x.element || (solo ? r.soloBosses?.get(x.season)?.element : "") || "";
+    $("#raid-view").innerHTML = `<div class="table-wrap"><table class="raid-table ${solo ? "has-season" : ""}">
+        <thead><tr>${solo ? `<th class="sticky rs">시즌</th>` : ""}<th class="sticky rb">보스</th><th>약점</th>${cols.map((a) => `<th>${esc(a)}</th>`).join("")}<th>일정</th><th class="rnote-col">메모 · 기타</th></tr></thead>
         <tbody>${list.map((x) => `<tr data-id="${esc(x.id)}">
-            <td class="sticky"><div class="rt">${elIcon(x.element)}<b>${esc(title(x))}</b></div>
-                <div class="muted">${esc(dateRange(x))}${x.deck ? ` · ${esc(x.deck)}` : ""}</div>
-                ${x.note ? `<div class="rnote">${esc(x.note)}</div>` : ""}</td>
+            ${solo ? `<td class="sticky rs"><b>${x.season != null ? `S${x.season}` : "-"}</b></td>` : ""}
+            <td class="sticky rb"><b>${esc(x.boss || "보스 미입력")}</b></td>
+            <td class="rel">${elOf(x) ? `${elIcon(elOf(x))}<div class="muted">${ELEMENT[elOf(x)]}</div>` : `<span class="dim">-</span>`}</td>
             ${cols.map((a) => {
                 const res = x.results?.[a];
                 const b = best(res);
                 if (!b) return `<td class="dim">-${res?.memo ? `<div class="rmemo" title="${esc(res.memo)}">메모</div>` : ""}</td>`;
                 return `<td><b>${fmtScore(b.score)}</b>${b.runs > 1 ? `<small class="muted"> ·${b.runs}회</small>` : ""}<div>${pctBadge(b.pct)}</div>${b.deck.length ? `<div class="dks">${deckThumbs(b.deck, "tiny")}</div>` : ""}${res.memo ? `<div class="rmemo" title="${esc(res.memo)}">${esc(res.memo)}</div>` : ""}</td>`;
             }).join("")}
+            <td class="rdate">${x.start || x.dateText ? esc(dateRange(x)) : `<span class="dim">-</span>`}</td>
+            <td class="rnote-col">${x.deck ? `<div><b>${esc(x.deck)}</b></div>` : ""}${x.note ? `<div class="rnote-full" title="${esc(x.note)}">${esc(x.note)}</div>` : ""}</td>
         </tr>`).join("")}</tbody></table></div>`;
 }
 

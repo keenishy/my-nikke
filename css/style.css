@@ -201,7 +201,17 @@ dialog.wide { width: min(1200px, calc(100vw - 24px)); }
 .raid-table { border-collapse: collapse; width: 100%; }
 .raid-table th, .raid-table td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: center; vertical-align: top; font-size: 0.85rem; }
 .raid-table th { position: sticky; top: 0; background: var(--card); z-index: 1; }
-.raid-table .sticky { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 2; min-width: 200px; max-width: 260px; }
+.raid-table .sticky { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 2; }
+.raid-table th.sticky { z-index: 3; }
+.raid-table .rs { width: 52px; min-width: 52px; max-width: 52px; white-space: nowrap; }
+.raid-table.has-season .rb { left: 52px; }
+.raid-table .rb { min-width: 110px; max-width: 160px; box-shadow: 1px 0 0 var(--border); }
+.raid-table .rel { white-space: nowrap; }
+.raid-table .rel .el { width: 18px; height: 18px; }
+.raid-table .rel .muted { font-size: 0.72rem; }
+.raid-table .rdate { white-space: nowrap; color: var(--muted); }
+.raid-table .rnote-col { text-align: left; min-width: 180px; max-width: 280px; }
+.rnote-full { font-size: 0.78rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
 .raid-table tbody tr { cursor: pointer; }
 .raid-table tbody tr:hover td { background: var(--hover); }
 .raid-table td.dim { color: var(--faint); }
@@ -423,3 +433,5 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .union-history[open] summary h3::before { content: "▾ "; }
 .hist-table td, .hist-table th { text-align: center; white-space: nowrap; }
 .hist-table tr.mine td { background: var(--primary-soft); }
+.raid-table th, .raid-table .pct, .raid-table td small { white-space: nowrap; }
+.raid-table td:not(.sticky):not(.rnote-col):not(.rel):not(.rdate) { min-width: 92px; }
