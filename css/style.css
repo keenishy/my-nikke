@@ -426,7 +426,12 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .info-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .info-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; }
 .info-form input { border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; background: var(--card); color: var(--text); }
-.el-stats td { text-align: center; }
+.el-stats td, .el-stats th:not(.sticky) { text-align: center; }
+.el-stats td[title] { cursor: help; }
+.el-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.el-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-left: 4px; }
+.el-key.el-best { background: var(--max-soft); border: 1px solid var(--max); }
+.el-key.el-worst { background: var(--warn-soft); border: 1px solid var(--warn); }
 .el-stats td.el-best { background: var(--max-soft); }
 .el-stats td.el-worst { background: var(--warn-soft); }
 .union-history summary { cursor: pointer; list-style: none; }

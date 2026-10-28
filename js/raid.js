@@ -81,20 +81,24 @@ function statsFor(kind, acc) {
 const ELEMENTS = ["Fire", "Water", "Wind", "Electronic", "Iron"];
 function elementTable(cols) {
     const solo = r.raids.filter((x) => x.kind === "solo").map((x) => ({ ...x, element: x.element || r.soloBosses?.get(x.season)?.element || "" }));
+    // 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씀. 칸에 마우스를 올리면 계산에 들어간 시즌 목록이 보임
     const cell = (acc, el) => {
-        const pcts = solo.filter((x) => x.element === el).map((x) => best(x.results?.[acc])?.pct).filter((p) => p != null);
-        return pcts.length ? { avg: pcts.reduce((s, v) => s + v, 0) / pcts.length, n: pcts.length } : null;
+        const got = solo.filter((x) => x.element === el).map((x) => ({ x, pct: best(x.results?.[acc])?.pct })).filter((v) => v.pct != null)
+            .sort((a, b) => (b.x.season ?? 0) - (a.x.season ?? 0));
+        if (!got.length) return null;
+        return { avg: got.reduce((s, v) => s + v.pct, 0) / got.length, n: got.length, list: got.map((v) => `${title(v.x)} ${v.pct}%`).join("\n") };
     };
     const noEl = solo.filter((x) => !x.element).length;
-    return `<h3 class="sec">약점 속성별 솔로 레이드 <small class="muted">(보스별 최고 순위의 평균 · 낮을수록 좋음)</small></h3>
+    return `<h3 class="sec">약점 속성별 솔로 레이드 순위 <small class="muted">(그 속성이 약점인 시즌들의 평균 상위 % · 낮을수록 좋음)</small></h3>
         <div class="table-wrap"><table class="stats el-stats"><thead><tr><th class="sticky"></th>${ELEMENTS.map((el) => `<th>${elIcon(el)} ${ELEMENT[el]}</th>`).join("")}</tr></thead><tbody>
         ${cols.map((a) => {
             const cells = ELEMENTS.map((el) => cell(a, el));
             const avgs = cells.filter(Boolean).map((c) => c.avg);
             const [lo, hi] = [Math.min(...avgs), Math.max(...avgs)];
             return `<tr><td class="sticky"><b>${esc(a)}</b></td>${cells.map((c) => !c ? `<td class="dim">-</td>`
-                : `<td class="${avgs.length > 1 && c.avg === lo ? "el-best" : avgs.length > 1 && c.avg === hi ? "el-worst" : ""}">${pctBadge(+c.avg.toFixed(2))}<div class="muted">${c.n}회</div></td>`).join("")}</tr>`;
+                : `<td class="${avgs.length > 1 && c.avg === lo ? "el-best" : avgs.length > 1 && c.avg === hi ? "el-worst" : ""}" title="${esc(c.list)}">${pctBadge(+c.avg.toFixed(2))}<div class="muted">${c.n}시즌</div></td>`).join("")}</tr>`;
         }).join("")}</tbody></table></div>
+        <p class="muted el-legend"><span class="el-key el-best"></span>그 계정이 가장 잘하는 속성 <span class="el-key el-worst"></span>가장 약한 속성 · 칸에 마우스를 올리면 계산에 들어간 시즌이 보입니다. 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씁니다.</p>
         ${noEl ? `<p class="muted">약점 속성을 알 수 없는 솔로 레이드 ${noEl}회는 빠져 있습니다.</p>` : ""}`;
 }
 
