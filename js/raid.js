@@ -71,6 +71,28 @@ function statsFor(kind, acc) {
     return { count: list.length, top, bestPct: pcts.length ? Math.min(...pcts) : null, recent: avg(recent), all: avg(pcts) };
 }
 
+// 약점 속성별 솔로 레이드: 계정마다 그 속성 보스에서 받은 최고 순위(상위 %)의 평균
+// 속성 필터와 상관없이 전체 솔로 레이드 기록으로 계산 (약점을 안 넣은 기록은 시즌 번호로 블라블라 보스 목록에서 찾음)
+const ELEMENTS = ["Fire", "Water", "Wind", "Electronic", "Iron"];
+function elementTable(cols) {
+    const solo = r.raids.filter((x) => x.kind === "solo").map((x) => ({ ...x, element: x.element || r.soloBosses?.get(x.season)?.element || "" }));
+    const cell = (acc, el) => {
+        const pcts = solo.filter((x) => x.element === el).map((x) => best(x.results?.[acc])?.pct).filter((p) => p != null);
+        return pcts.length ? { avg: pcts.reduce((s, v) => s + v, 0) / pcts.length, n: pcts.length } : null;
+    };
+    const noEl = solo.filter((x) => !x.element).length;
+    return `<h3 class="sec">약점 속성별 솔로 레이드 <small class="muted">(보스별 최고 순위의 평균 · 낮을수록 좋음)</small></h3>
+        <div class="table-wrap"><table class="stats el-stats"><thead><tr><th class="sticky"></th>${ELEMENTS.map((el) => `<th>${elIcon(el)} ${ELEMENT[el]}</th>`).join("")}</tr></thead><tbody>
+        ${cols.map((a) => {
+            const cells = ELEMENTS.map((el) => cell(a, el));
+            const avgs = cells.filter(Boolean).map((c) => c.avg);
+            const [lo, hi] = [Math.min(...avgs), Math.max(...avgs)];
+            return `<tr><td class="sticky"><b>${esc(a)}</b></td>${cells.map((c) => !c ? `<td class="dim">-</td>`
+                : `<td class="${avgs.length > 1 && c.avg === lo ? "el-best" : avgs.length > 1 && c.avg === hi ? "el-worst" : ""}">${pctBadge(+c.avg.toFixed(2))}<div class="muted">${c.n}회</div></td>`).join("")}</tr>`;
+        }).join("")}</tbody></table></div>
+        ${noEl ? `<p class="muted">약점 속성을 알 수 없는 솔로 레이드 ${noEl}회는 빠져 있습니다.</p>` : ""}`;
+}
+
 function renderStats() {
     const cols = accs();
     $("#raid-count").textContent = "";
@@ -83,6 +105,7 @@ function renderStats() {
                 <td>${s.bestPct != null ? `${s.bestPct}%` : "-"}</td><td><b>상위 ${s.recent}%</b></td><td>상위 ${s.all}%</td></tr>`;
         }).join("")}</tbody></table></div>`;
     $("#raid-view").innerHTML = `${table("solo")}
+        ${elementTable(cols)}
         <h3 class="sec">솔로 레이드 순위 추이 (상위 %)</h3><div class="chart-box"><canvas id="raid-chart"></canvas></div>
         ${table("coop")}`;
     drawChart();
@@ -332,7 +355,7 @@ export async function initRaid() {
     if (started) return;
     started = true;
     $("#raid-view").innerHTML = `<p class="empty">레이드 기록을 불러오는 중…</p>`;
-    [r.raids, r.meta] = await Promise.all([loadRaids(), loadNikkeList()]);
+    [r.raids, r.meta, r.soloBosses] = await Promise.all([loadRaids(), loadNikkeList(), loadSoloRaidBosses()]);
     fillBossList();
 
     document.querySelectorAll("#raid-subtabs button").forEach((b) => b.addEventListener("click", () => { r.view = b.dataset.rview; saveUi(); render(); }));

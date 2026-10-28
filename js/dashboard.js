@@ -5,7 +5,7 @@ import { loadRaids, best, fmtScore } from "./raid-data.js";
 import { loadBanners, accountSummary } from "./gacha-data.js";
 import { openTodayEntry } from "./intercept.js";
 import { checkWorker, getAccessKey } from "./sync.js";
-import { downloadBackup } from "./backup.js";
+import { downloadBackup, readBackup, restoreBackup } from "./backup.js";
 
 // 홈: 각 탭의 데이터를 읽기만 해서 오늘 할 일과 최근 결과를 요약
 const $ = (s, el = document) => el.querySelector(s);
@@ -111,7 +111,8 @@ export async function renderDashboard() {
     const rosters = JSON.parse(localStorage.getItem("hub_roster") || "{}");
     const [days, raids, banners, meta, warning] = await Promise.all([loadDays(), loadRaids(), loadBanners(), loadNikkeList(), cookieWarning()]);
     view.innerHTML = `${warning}<div class="dash-links"><a class="btn" href="https://game.naver.com/lounge/nikke/board/48" target="_blank" rel="noopener">공식 공지·점검 일정 (네이버 라운지)</a>
-        <span class="spacer"></span><span class="muted" id="backup-status"></span><button class="btn" id="backup-btn" title="모든 기록을 JSON 파일 하나로 내려받습니다">백업 다운로드</button></div>
+        <span class="spacer"></span><span class="muted" id="backup-status"></span><button class="btn" id="backup-btn" title="모든 기록을 JSON 파일 하나로 내려받습니다">백업 다운로드</button>
+        <label class="btn" title="백업 파일로 기록을 되돌립니다">백업 복원<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
     <div class="dash-grid">
         ${interceptCard(days, rosters)}
         ${interceptMonthCard(days)}
@@ -128,6 +129,20 @@ export async function renderDashboard() {
             status.textContent = `문서 ${n.toLocaleString()}개 백업 완료`;
         } catch (err) { status.textContent = `백업하지 못했습니다: ${err.message}`; }
         btn.disabled = false;
+    });
+    $("#restore-file").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        e.target.value = "";
+        if (!file) return;
+        const status = $("#backup-status");
+        try {
+            const data = await readBackup(file);
+            const counts = Object.entries(data.collections).map(([k, v]) => `· ${k}: ${Object.keys(v).length}개`).join("\n");
+            if (!confirm(`${new Date(data.saved_at).toLocaleString("ko-KR")}에 만든 백업으로 되돌릴까요?\n\n${counts}\n\n· 백업에 있는 기록은 백업 당시 내용으로 덮어씁니다.\n· 백업 뒤에 새로 만든 기록은 지우지 않고 그대로 둡니다.`)) return;
+            const n = await restoreBackup(data, (m) => (status.textContent = m));
+            alert(`문서 ${n.toLocaleString()}개를 복원했습니다. 화면을 새로 불러옵니다.`);
+            location.reload();
+        } catch (err) { status.textContent = `복원하지 못했습니다: ${err.message}`; }
     });
     $("#dash-ic-entry")?.addEventListener("click", () => {
         document.querySelector('.hub-tab[data-tab="interception"]').click();

@@ -26,6 +26,8 @@ const u = {
     members: {},         // 유니온 → { fetched_at, list: [{id, nick, level, synchro}], firstSeen: {id: 날짜} }
     diffTab: "all",
     sort: localStorage.getItem("hub_union_sort") || "join",
+    histSort: localStorage.getItem("hub_union_hist_sort") || "rate",
+    histOpen: localStorage.getItem("hub_union_hist_open") === "1",
 };
 
 const guildIds = () => {
@@ -85,6 +87,8 @@ function render() {
             <span class="muted" id="un-raid-status"></span>
         </div>
         <div id="un-raid">${u.raids[key] ? raidHtml(u.raids[key]) : `<p class="muted">${season ? "아직 불러오지 않은 시즌입니다." : ""} 상세 기록은 이 유니온 소속 계정의 블라블라 쿠키가 Cloudflare 비밀값에 있어야 받을 수 있습니다 (이름은 아무거나, 자동으로 찾아 씀).</p>`}</div>
+
+        ${historyHtml()}
 
         <h3 class="sec">메모</h3>
         <textarea id="un-memo" rows="3" class="union-memo" placeholder="유니온 규칙, 공략, 기타 메모">${esc(u.memos[u.current] || "")}</textarea>
@@ -174,6 +178,58 @@ function raidHtml(r) {
         </table></div>`;
 }
 
+// ---------- 멤버 시즌 참여 기록 ----------
+// 저장해 둔 시즌 기록을 모아서 멤버마다 시즌별 참여 여부를 보여 줌
+// 가입일을 알 수 없으므로, 처음 공격한 시즌(또는 허브가 처음 본 날) 이전 시즌은 "가입 전"으로 보고 계산에서 뺌
+function historyHtml() {
+    const g = u.current;
+    const saved = Object.values(u.raids).filter((r) => r.guild === g).sort((a, b) => Number(b.season) - Number(a.season));
+    if (saved.length < 2) return "";
+    const info = new Map(u.seasons.map((s) => [String(s.id), s]));
+    const label = (r) => info.get(String(r.season))?.season_start_date.slice(5, 10).replace("-", "/") || String(r.season).slice(-2);
+    const startOf = (r) => (info.get(String(r.season))?.start_ts || 0) * 1000;
+
+    const roster = u.members[g]?.list || [];
+    const people = roster.length ? roster.map((m) => ({ id: m.id, nick: m.nick }))
+        : [...new Map(saved.flatMap((r) => r.attacks.map((a) => [a.openid, { id: a.openid, nick: a.nick }]))).values()];
+    const accs = accountsOf(g);
+    const rows = people.map((p) => {
+        const per = saved.map((r) => {
+            const list = r.attacks.filter((a) => a.openid === p.id);
+            return { n: list.length, dmg: list.reduce((s, a) => s + a.damage, 0) };
+        });
+        // 처음 참여한 시즌 = 가장 오래된 참여 시즌. 그보다 앞은 가입 전으로 봄
+        let first = per.map((x) => x.n > 0).lastIndexOf(true);
+        const seen = u.members[g]?.firstSeen?.[p.id];
+        if (seen) { const i = saved.findIndex((r) => startOf(r) <= new Date(seen).getTime()); if (i >= 0 && (first < 0 || i < first)) first = i; }
+        // 저장된 시즌에 공격 기록이 전혀 없으면 언제 들어왔는지 알 수 없으므로 최근 시즌만 셈
+        const span = first < 0 ? 1 : first + 1;
+        const joined = per.slice(0, span).filter((x) => x.n > 0);
+        return {
+            ...p, per, span, joinedCount: joined.length,
+            rate: span ? joined.length / span : 0,
+            avg: joined.length ? joined.reduce((s, x) => s + x.dmg, 0) / joined.length : 0,
+            mine: accs.includes(p.nick),
+        };
+    });
+    rows.sort(u.histSort === "dmg" ? (a, b) => b.avg - a.avg : (a, b) => a.rate - b.rate || a.avg - b.avg);
+
+    return `<details class="union-history" ${u.histOpen ? "open" : ""}><summary><h3 class="sec">멤버 시즌 참여 기록 <small class="muted">(저장된 ${saved.length}시즌 · ${roster.length ? "현재 멤버" : "공격 기록이 있는 사람"} 기준)</small></h3></summary>
+        <div class="filters">
+            <div class="view-toggle" id="un-hist-sort">${[["rate", "참여율 낮은 순"], ["dmg", "평균 딜 순"]].map(([k, l]) => `<button data-hsort="${k}" class="${u.histSort === k ? "on" : ""}">${l}</button>`).join("")}</div>
+            <span class="muted">숫자 = 그 시즌 공격 횟수 · ✕ = 미참여 · 빈칸 = 가입 전(추정)</span>
+        </div>
+        <div class="table-wrap"><table class="stats hist-table">
+            <thead><tr><th class="sticky">닉네임</th><th>참여</th><th>시즌 평균 딜</th>${saved.map((r) => `<th>${label(r)}</th>`).join("")}</tr></thead>
+            <tbody>${rows.map((m) => `<tr class="${m.mine ? "mine" : ""}">
+                <td class="sticky"><b>${esc(m.nick)}</b>${m.mine ? ` <span class="mine-tag">내 계정</span>` : ""}${m.joinedCount ? "" : ` <span class="muted">(참여 기록 없음)</span>`}</td>
+                <td><b class="${m.rate >= 0.9 ? "good" : m.rate < 0.6 ? "bad" : ""}">${m.joinedCount}/${m.span}</b> <small class="muted">${Math.round(m.rate * 100)}%</small></td>
+                <td>${m.avg ? fmtDmg(Math.round(m.avg)) : "-"}</td>
+                ${m.per.map((x, i) => i >= m.span ? `<td class="dim"></td>` : x.n ? `<td title="${fmtDmg(x.dmg)}">${x.n}</td>` : `<td class="miss">✕</td>`).join("")}
+            </tr>`).join("")}</tbody>
+        </table></div></details>`;
+}
+
 // ---------- 동작 ----------
 async function refreshInfo() {
     if (!getAccessKey()) { alert("도감 탭의 「설정」에서 접속 키를 먼저 넣어 주세요."); return; }
@@ -186,31 +242,34 @@ async function refreshInfo() {
     } catch (e) { $("#un-status").textContent = `실패: ${e.message}`; }
 }
 
+// 받는 도중에 다른 유니온 탭을 눌러도 처음 고른 유니온에 저장되도록 유니온·시즌을 먼저 고정
 async function loadSeason() {
-    const s = u.seasons.find((x) => String(x.id) === u.season);
+    const g = u.current, season = u.season;
+    const s = u.seasons.find((x) => String(x.id) === season);
     if (!s) return;
     $("#un-raid-status").textContent = "받는 중…";
     try {
-        const r = normalizeRaid(await fetchUnionRaid(u.current, u.season, isLive(s)));
-        const key = `${u.current}_${u.season}`;
+        const r = normalizeRaid(await fetchUnionRaid(g, season, isLive(s)));
+        const key = `${g}_${season}`;
         await setDoc(doc(db, "union_raids", key), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
         u.raids[key] = r;
-        await refreshMembers(true);
+        await refreshMembers(true, g);
         render();
     } catch (e) { $("#un-raid-status").textContent = `실패: ${e.message}`; }
 }
 
 // 블라블라에 남아 있는 지난 시즌을 한 번에 저장 (하나씩 순서대로)
 async function loadAllSeasons() {
-    const todo = u.seasons.filter((s) => !u.raids[`${u.current}_${s.id}`]);
+    const g = u.current;
+    const todo = u.seasons.filter((s) => !u.raids[`${g}_${s.id}`]);
     if (!todo.length) { $("#un-raid-status").textContent = "모든 시즌을 이미 받았습니다."; return; }
     const keep = u.season;
     for (const [i, s] of todo.entries()) {
         $("#un-raid-status").textContent = `받는 중 ${i + 1}/${todo.length} (${seasonLabel(s)})`;
         try {
-            const r = normalizeRaid(await fetchUnionRaid(u.current, String(s.id), isLive(s)));
-            await setDoc(doc(db, "union_raids", `${u.current}_${s.id}`), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
-            u.raids[`${u.current}_${s.id}`] = r;
+            const r = normalizeRaid(await fetchUnionRaid(g, String(s.id), isLive(s)));
+            await setDoc(doc(db, "union_raids", `${g}_${s.id}`), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
+            u.raids[`${g}_${s.id}`] = r;
         } catch (e) { $("#un-raid-status").textContent = `실패: ${e.message}`; return; }
     }
     u.season = keep;
@@ -219,14 +278,14 @@ async function loadAllSeasons() {
 }
 
 // 멤버 목록: 두 번째 갱신부터 새로 보인 멤버의 날짜를 기록해서 가입순 추정에 씀
-async function refreshMembers(silent = false) {
+async function refreshMembers(silent = false, g = u.current) {
     try {
-        const r = await fetchUnionMembers(u.current);
-        const prev = u.members[u.current];
+        const r = await fetchUnionMembers(g);
+        const prev = u.members[g];
         const firstSeen = { ...(prev?.firstSeen || {}) };
         if (prev) for (const m of r.members) if (!prev.list.some((p) => p.id === m.id) && !firstSeen[m.id]) firstSeen[m.id] = r.fetched_at;
-        u.members[u.current] = { fetched_at: r.fetched_at, list: r.members, firstSeen };
-        await setDoc(doc(db, "union_members", u.current), { data: JSON.stringify(u.members[u.current]) });
+        u.members[g] = { fetched_at: r.fetched_at, list: r.members, firstSeen };
+        await setDoc(doc(db, "union_members", g), { data: JSON.stringify(u.members[g]) });
         render();
     } catch (e) { if (!silent) $("#un-raid-status").textContent = `멤버 목록 실패: ${e.message}`; }
 }
@@ -254,7 +313,8 @@ async function setup() {
         loadNikkeList(),
     ]);
     u.info = infoDoc.exists() ? JSON.parse(infoDoc.data().data) : null;
-    raidSnap.forEach((d) => (u.raids[d.id] = JSON.parse(d.data().data)));
+    // 예전 버그로 다른 유니온 기록이 들어간 문서는 "안 받은 시즌"으로 둬서 다시 불러오면 바로잡히게 함
+    raidSnap.forEach((d) => { const r = JSON.parse(d.data().data); if (d.id === `${r.guild}_${r.season}`) u.raids[d.id] = r; });
     memoSnap.forEach((d) => (u.memos[d.id] = d.data().memo || ""));
     memberSnap.forEach((d) => (u.members[d.id] = JSON.parse(d.data().data)));
     u.seasons = seasons.filter((s) => s.start_ts * 1000 <= Date.now()).sort((a, b) => b.start_ts - a.start_ts);
@@ -275,12 +335,17 @@ async function setup() {
         if (e.target.id === "un-load") loadSeason();
         if (e.target.id === "un-load-all") loadAllSeasons();
         if (e.target.id === "un-members") refreshMembers();
+        const hs = e.target.closest("[data-hsort]")?.dataset.hsort;
+        if (hs) { u.histSort = hs; localStorage.setItem("hub_union_hist_sort", hs); render(); }
         const diff = e.target.closest("[data-diff]")?.dataset.diff;
         if (diff) { u.diffTab = diff; render(); }
         if (e.target.id === "un-memo-save") saveMemo();
         const m = e.target.closest("tr[data-member]")?.dataset.member;
         if (m) { u.openMember = u.openMember === m ? null : m; render(); }
     });
+    $("#union-view").addEventListener("toggle", (e) => {
+        if (e.target.classList?.contains("union-history")) { u.histOpen = e.target.open; localStorage.setItem("hub_union_hist_open", u.histOpen ? "1" : "0"); }
+    }, true);
     $("#union-view").addEventListener("change", (e) => {
         if (e.target.id === "un-season") { u.season = e.target.value; u.openMember = null; render(); }
         if (e.target.id === "un-sort") { u.sort = e.target.value; localStorage.setItem("hub_union_sort", u.sort); render(); }

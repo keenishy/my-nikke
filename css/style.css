@@ -414,3 +414,12 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .info-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .info-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; }
 .info-form input { border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; background: var(--card); color: var(--text); }
+.el-stats td { text-align: center; }
+.el-stats td.el-best { background: var(--max-soft); }
+.el-stats td.el-worst { background: var(--warn-soft); }
+.union-history summary { cursor: pointer; list-style: none; }
+.union-history summary::-webkit-details-marker { display: none; }
+.union-history summary h3::before { content: "▸ "; color: var(--muted); }
+.union-history[open] summary h3::before { content: "▾ "; }
+.hist-table td, .hist-table th { text-align: center; white-space: nowrap; }
+.hist-table tr.mine td { background: var(--primary-soft); }

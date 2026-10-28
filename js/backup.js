@@ -1,4 +1,4 @@
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, getDocs, doc, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./store.js";
 
 // 허브 Firebase의 모든 기록을 JSON 파일 하나로 내려받음 (문서 수만큼 읽기 한도를 쓰므로 가끔만)
@@ -21,4 +21,34 @@ export async function downloadBackup(onProgress = () => {}) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     return total;
+}
+
+// 백업 파일 → Firebase에 다시 씀. 백업에 있는 문서만 덮어쓰고, 백업 뒤에 새로 생긴 문서는 그대로 둠
+// (Firestore 날짜 값은 JSON에서 {seconds, nanoseconds}로 저장되므로 다시 날짜 값으로 바꿈)
+const revive = (v) => {
+    if (Array.isArray(v)) return v.map(revive);
+    if (v && typeof v === "object") {
+        const keys = Object.keys(v);
+        if (keys.length === 2 && typeof v.seconds === "number" && typeof v.nanoseconds === "number") return new Timestamp(v.seconds, v.nanoseconds);
+        return Object.fromEntries(keys.map((k) => [k, revive(v[k])]));
+    }
+    return v;
+};
+
+export async function readBackup(file) {
+    let data;
+    try { data = JSON.parse(await file.text()); } catch { throw new Error("JSON 파일이 아닙니다"); }
+    if (data?.app !== "nikke-hub" || !data.collections) throw new Error("니케 허브 백업 파일이 아닙니다");
+    return data;
+}
+
+export async function restoreBackup(data, onProgress = () => {}) {
+    const docs = Object.entries(data.collections).flatMap(([name, list]) => Object.entries(list).map(([id, d]) => [name, id, d]));
+    for (let i = 0; i < docs.length; i += 400) {
+        onProgress(`복원 중 ${Math.min(i + 400, docs.length).toLocaleString()} / ${docs.length.toLocaleString()}`);
+        const batch = writeBatch(db);
+        for (const [name, id, d] of docs.slice(i, i + 400)) batch.set(doc(db, name, id), revive(d));
+        await batch.commit();
+    }
+    return docs.length;
 }
