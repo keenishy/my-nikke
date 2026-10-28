@@ -2,8 +2,8 @@
 //
 // 필요한 비밀값 (Cloudflare 대시보드 → Worker → Settings → Variables and Secrets):
 //   BLA_COOKIE  : 블라블라에 로그인한 브라우저의 cookie 헤더 값 전체 (기본 계정)
-//   BLA_COOKIE_<유니온id> : (선택) 그 유니온 소속 계정의 cookie. 유니온 레이드·멤버는 소속 계정으로만 조회됨
-//                    예: BLA_COOKIE_7811, BLA_COOKIE_22260, BLA_COOKIE_29131
+//   (선택) 다른 계정 cookie를 이름 상관없이 더 넣을 수 있음 (예: pano, Smiley4)
+//          유니온 레이드·멤버는 소속 계정으로만 조회되므로, 넣어 둔 cookie를 차례로 시도해 맞는 걸 씀
 //   ACCOUNTS    : {"계정이름":"1234567890", ...}  (계정 이름 → openid 숫자)
 //   ACCESS_KEY  : 아무 긴 문자열. 허브가 요청할 때 ?key= 로 같이 보냄
 //
@@ -75,8 +75,9 @@ export default {
     if (url.pathname === "/") {
       const me = await post(env, "game/proxy/Game/GetSavedRoleInfo", {});
       const extra = {};
-      for (const k of Object.keys(env).filter((k) => /^BLA_COOKIE_\d+$/.test(k))) {
-        extra[k] = codeOf(await calm(env, "game/proxy/Game/GetSavedRoleInfo", {}, env[k])) === 0 ? "ok" : "만료 또는 잘못됨";
+      for (const [k, v] of Object.entries(env)) {
+        if (k === "BLA_COOKIE" || typeof v !== "string" || !v.includes("game_token=")) continue;
+        extra[k] = codeOf(await calm(env, "game/proxy/Game/GetSavedRoleInfo", {}, v)) === 0 ? "ok" : "만료 또는 잘못됨";
       }
       return reply({ accounts: Object.keys(accounts), cookie: codeOf(me) === 0 ? "ok" : "만료 또는 잘못됨", union_cookies: extra });
     }
@@ -125,10 +126,29 @@ export default {
       return reply({ fetched_at: new Date().toISOString(), members, unions });
     }
 
-    // 유니온 레이드·멤버는 로그인 계정이 속한 유니온만 보이므로, 유니온별 쿠키가 있으면 그걸 씀
-    const guildCookie = (guild) => env[`BLA_COOKIE_${guild}`] || env.BLA_COOKIE;
-    const notMember = (guild) => reply({ error: `이 유니온 소속 계정의 블라블라 쿠키가 필요합니다. Cloudflare에 BLA_COOKIE_${guild} 비밀값을 넣어 주세요.` }, 403);
-    const expired = (guild) => reply({ error: `블라블라 로그인 쿠키가 만료됐습니다. ${env[`BLA_COOKIE_${guild}`] ? `BLA_COOKIE_${guild}` : "BLA_COOKIE"}를 다시 넣어 주세요.` }, 401);
+    // 유니온 레이드·멤버는 로그인 계정이 속한 유니온만 보이므로, 넣어 둔 쿠키를 차례로 시도
+    // (이 유니온에서 성공한 쿠키를 앞에 두기 위해 BLA_COOKIE_<유니온id> 이름이 있으면 먼저 씀)
+    const cookieCandidates = (guild) => {
+      const all = Object.entries(env).filter(([k, v]) => typeof v === "string" && v.includes("game_token="));
+      const named = all.filter(([k]) => k === `BLA_COOKIE_${guild}`);
+      const rest = all.filter(([k]) => k !== `BLA_COOKIE_${guild}` && k !== "BLA_COOKIE");
+      const base = all.filter(([k]) => k === "BLA_COOKIE");
+      return [...named, ...rest, ...base];
+    };
+    // fn(cookie) 결과가 "유니온 소속 아님"이 아닐 때까지 쿠키를 바꿔 가며 시도
+    async function withGuildCookie(guild, fn) {
+      let expiredName = "";
+      for (const [name, cookie] of cookieCandidates(guild)) {
+        const result = await fn(cookie);
+        const code = codeOf(result[0]);
+        if (code === 1303028) continue;
+        if (code === 300001) { expiredName ||= name; continue; }
+        return { result, name };
+      }
+      return { error: expiredName
+        ? reply({ error: `블라블라 로그인 쿠키(${expiredName})가 만료됐습니다. 그 계정 쿠키를 다시 넣어 주세요.` }, 401)
+        : reply({ error: "이 유니온 소속 계정의 블라블라 쿠키가 없습니다. 그 유니온 계정으로 로그인한 쿠키를 Cloudflare 비밀값에 추가해 주세요." }, 403) };
+    }
 
     if (url.pathname === "/union-raid") {
       const guild = url.searchParams.get("guild");
@@ -136,15 +156,19 @@ export default {
       if (!/^\d+$/.test(guild || "") || !/^\d+$/.test(season || "")) return reply({ error: "guild, season 값이 필요합니다" }, 400);
       // 진행 중인 시즌은 다른 API를 씀 (블라블라 유니온 레이드 페이지와 같은 방식)
       const live = url.searchParams.get("live") === "1";
-      const cookie = guildCookie(guild);
-      const me = (cookie.match(/game_openid=(\d+)/) || [])[1] || Object.values(accounts)[0];
-      const [raid, level] = live
-        ? [await calm(env, "game/proxy/Game/GetUnionRaidData", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie),
-           await calm(env, "game/proxy/Game/GetUnionRaidLevelInfo", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie)]
-        : [await calm(env, "game/proxy/Game/GetUnionRaidDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie),
-           await calm(env, "game/proxy/Game/GetUnionRaidLevelDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie)];
-      if (codeOf(raid) === 1303028) return notMember(guild);
-      if (codeOf(raid) === 300001) return expired(guild);
+      const got = await withGuildCookie(guild, async (cookie) => {
+        const me = (cookie.match(/game_openid=(\d+)/) || [])[1] || Object.values(accounts)[0];
+        const first = live
+          ? await calm(env, "game/proxy/Game/GetUnionRaidData", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie)
+          : await calm(env, "game/proxy/Game/GetUnionRaidDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie);
+        if (codeOf(first) !== 0) return [first];
+        const second = live
+          ? await calm(env, "game/proxy/Game/GetUnionRaidLevelInfo", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie)
+          : await calm(env, "game/proxy/Game/GetUnionRaidLevelDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie);
+        return [first, second];
+      });
+      if (got.error) return got.error;
+      const [raid, level] = got.result;
       if (codeOf(raid) !== 0) return reply({ error: "유니온 레이드 기록을 받지 못했습니다", detail: raid.slice(0, 300) }, 502);
       return reply(`{"guild":${JSON.stringify(guild)},"season":${JSON.stringify(season)},"fetched_at":${JSON.stringify(new Date().toISOString())},"raid":${raid},"level":${level}}`);
     }
@@ -152,9 +176,9 @@ export default {
     if (url.pathname === "/union-members") {
       const guild = url.searchParams.get("guild");
       if (!/^\d+$/.test(guild || "")) return reply({ error: "guild 값이 필요합니다" }, 400);
-      const text = await calm(env, "game/proxy/Game/GetGuildMembers", { guild_id: guild, nikke_area_id: AREA }, guildCookie(guild));
-      if (codeOf(text) === 1303028) return notMember(guild);
-      if (codeOf(text) === 300001) return expired(guild);
+      const got = await withGuildCookie(guild, async (cookie) => [await calm(env, "game/proxy/Game/GetGuildMembers", { guild_id: guild, nikke_area_id: AREA }, cookie)]);
+      if (got.error) return got.error;
+      const [text] = got.result;
       if (codeOf(text) !== 0) return reply({ error: "멤버 목록을 받지 못했습니다", detail: text.slice(0, 300) }, 502);
       const items = JSON.parse(text).data?.items || [];
       return reply({ guild, fetched_at: new Date().toISOString(),
