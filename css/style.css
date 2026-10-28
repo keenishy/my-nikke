@@ -20,6 +20,11 @@ a { color: var(--primary); }
 /* 상단 탭 */
 .hub-header { position: sticky; top: 0; z-index: 10; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 20px; padding: 0 16px; }
 .brand { font-weight: 800; letter-spacing: 0.04em; white-space: nowrap; }
+.user-btn { margin-left: auto; flex: none; }
+.login-gate { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; padding: 16px; }
+.login-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; width: min(360px, 100%); text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.login-card .brand { font-size: 1.3rem; }
+.login-card p { margin: 0; word-break: keep-all; }
 .hub-tabs { display: flex; overflow-x: auto; scrollbar-width: none; }
 .hub-tab { background: none; border: none; border-bottom: 3px solid transparent; padding: 16px 14px 13px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .hub-tab.active { color: var(--text); border-bottom-color: var(--primary); }

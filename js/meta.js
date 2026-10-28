@@ -105,6 +105,18 @@ export async function loadEnglishNames() {
     return englishNames;
 }
 
+// 솔로 레이드 시즌 번호 → 보스 (블라블라 AI 덱 추천용 보스 목록, preset_group_id 100XX = 시즌 XX)
+// element_id는 보스 자신의 속성이라 약점은 상성으로 바꿈 (수냉 보스 → 전격 약점)
+const WEAKNESS_OF = { 100001: "Water", 200001: "Electronic", 300001: "Fire", 400001: "Iron", 500001: "Wind" };
+let soloBosses = null;
+export async function loadSoloRaidBosses() {
+    soloBosses ||= getJson("boss/ai_lineup_boss.json")
+        .then((list) => new Map(list.filter((b) => b.type_name === "SoloRaidCommon" && (b.wave_order ?? 1) === 1)
+            .map((b) => [b.preset_group_id - 10000, { boss: b.wave_name?.ko || "", bossEn: b.wave_name?.en || "", element: WEAKNESS_OF[b.bosses?.[0]?.element_id?.[0]] || "" }])))
+        .catch(() => new Map());
+    return soloBosses;
+}
+
 // 오버로드 옵션 종류 (state_effects.function_type)
 export const OPTION = {
     StatAtk: "공격력",

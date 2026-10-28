@@ -49,21 +49,26 @@ export function accountSummary(slots = {}) {
     return s;
 }
 
-export async function loadBanners() {
-    const snap = await getDocs(collection(db, "gacha_banners"));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+// 한 번 읽은 목록은 저장·삭제하기 전까지 다시 씀 (Firebase 읽기 한도 절약)
+let bannersCache = null;
+export function loadBanners() {
+    bannersCache ||= getDocs(collection(db, "gacha_banners")).then((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+        .catch((e) => { bannersCache = null; throw e; });
+    return bannersCache;
 }
 
 export async function saveBannerInfo(id, info) {
+    bannersCache = null;
     await setDoc(doc(db, "gacha_banners", id), { ...info, edited: true }, { merge: true });
 }
 
 export async function saveSlot(id, account, key, slot) {
+    bannersCache = null;
     const empty = !slot.d.length && !slot.b && !slot.m.trim();
     await updateDoc(doc(db, "gacha_banners", id), new FieldPath("results", account, key), empty ? deleteField() : slot, "edited", true);
 }
 
-export const deleteBanner = (id) => deleteDoc(doc(db, "gacha_banners", id));
+export const deleteBanner = (id) => { bannersCache = null; return deleteDoc(doc(db, "gacha_banners", id)); };
 
 export function newBannerId() {
     return `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -140,6 +145,7 @@ export async function buildLegacyBanners(releaseDates) {
 export async function importLegacy(banners, existing) {
     const edited = new Set(existing.filter((b) => b.edited).map((b) => b.id));
     const todo = banners.filter((b) => !edited.has(b.id));
+    bannersCache = null;
     for (let i = 0; i < todo.length; i += 400) {
         const batch = writeBatch(db);
         for (const { id, ...b } of todo.slice(i, i + 400)) batch.set(doc(db, "gacha_banners", id), b);

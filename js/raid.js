@@ -1,5 +1,5 @@
 import { ACCOUNTS } from "./config.js";
-import { ELEMENT, ELEMENT_ICON, loadNikkeList, portraitUrl } from "./meta.js";
+import { ELEMENT, ELEMENT_ICON, loadNikkeList, portraitUrl, loadSoloRaidBosses } from "./meta.js";
 import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids } from "./raid-data.js";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -234,9 +234,24 @@ function openEdit(raid) {
             <input class="memo" placeholder="${esc(a)} 메모" value="${esc(res?.memo || "")}"></div>`;
     }).join("");
     toggleKindFields();
+    f.dataset.auto = "";
+    fillFromSeason();
     $("#raid-delete").hidden = !raid;
     $("#raid-title").textContent = raid ? "레이드 기록 수정" : "새 레이드 기록";
     $("#raid-dialog").showModal();
+}
+
+// 솔로 레이드: 시즌 번호로 보스·영어 표기·약점을 채움 (비어 있는 칸, 또는 전에 자동으로 채운 값만 바꿈)
+async function fillFromSeason() {
+    const f = $("#raid-form");
+    if (f.kind.value !== "solo") return;
+    const info = (await loadSoloRaidBosses()).get(parseInt(f.season.value));
+    const auto = f.dataset.auto ? JSON.parse(f.dataset.auto) : {};
+    const next = {};
+    for (const key of ["boss", "bossEn", "element"]) {
+        if (!f[key].value || f[key].value === auto[key]) { f[key].value = info?.[key] || ""; next[key] = f[key].value; }
+    }
+    f.dataset.auto = JSON.stringify(next);
 }
 
 function toggleKindFields() {
@@ -339,7 +354,8 @@ export async function initRaid() {
 
     const f = $("#raid-form");
     f.addEventListener("submit", submitRaid);
-    f.kind.addEventListener("change", toggleKindFields);
+    f.kind.addEventListener("change", () => { toggleKindFields(); fillFromSeason(); });
+    f.season.addEventListener("input", fillFromSeason);
     f.boss.addEventListener("change", () => {
         const prev = r.bossInfo.get(f.boss.value.trim());
         if (prev) { f.element.value ||= prev.element; f.bossEn.value ||= prev.bossEn || ""; }

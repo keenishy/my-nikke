@@ -8,13 +8,16 @@ import { db } from "./store.js";
 
 export const KIND = { solo: "솔로 레이드", coop: "협동 작전" };
 
-export async function loadRaids() {
-    const snap = await getDocs(collection(db, "raids"));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+// 한 번 읽은 목록은 저장·삭제하기 전까지 다시 씀 (Firebase 읽기 한도 절약)
+let raidsCache = null;
+export function loadRaids() {
+    raidsCache ||= getDocs(collection(db, "raids")).then((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+        .catch((e) => { raidsCache = null; throw e; });
+    return raidsCache;
 }
 
-export const saveRaid = ({ id, ...raid }) => setDoc(doc(db, "raids", id), { ...raid, edited: true });
-export const deleteRaid = (id) => deleteDoc(doc(db, "raids", id));
+export const saveRaid = ({ id, ...raid }) => { raidsCache = null; return setDoc(doc(db, "raids", id), { ...raid, edited: true }); };
+export const deleteRaid = (id) => { raidsCache = null; return deleteDoc(doc(db, "raids", id)); };
 export const newRaidId = () => `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 // 한 계정의 최고 기록 (점수는 가장 높은 것, 상위 %는 가장 낮은 것)
@@ -89,6 +92,7 @@ export async function buildLegacyRaids() {
 export async function importLegacyRaids(raids, existing) {
     const edited = new Set(existing.filter((r) => r.edited).map((r) => r.id));
     const todo = raids.filter((r) => !edited.has(r.id));
+    raidsCache = null;
     const batch = writeBatch(db);
     for (const { id, ...r } of todo) batch.set(doc(db, "raids", id), r);
     await batch.commit();

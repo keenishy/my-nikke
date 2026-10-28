@@ -49,13 +49,17 @@ export function actualOf(res) {
 // 기존 분포 통계처럼 메모에 "안했/못함/까먹"이 있으면 그날은 분포에서 뺌
 export const excludedFromDist = (res) => res.skip || /안했|못함|까먹/.test(res.memo || "");
 
-export async function loadDays() {
-    const snap = await getDocs(collection(db, "intercept"));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+// 문서 하나를 읽을 때마다 무료 한도(하루 5만 회)에서 빠지므로, 한 번 읽은 목록은 저장하기 전까지 다시 씀
+let daysCache = null;
+export function loadDays() {
+    daysCache ||= getDocs(collection(db, "intercept")).then((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+        .catch((e) => { daysCache = null; throw e; });
+    return daysCache;
 }
 
 // 한 날짜의 여러 계정 기록을 한 번에 저장 (merge라서 다른 계정 칸은 그대로)
 export async function saveDay(date, results) {
+    daysCache = null;
     await setDoc(doc(db, "intercept", date), { date, edited: true, results }, { merge: true });
 }
 
@@ -98,6 +102,7 @@ export async function buildLegacyDays(url) {
 export async function importLegacyDays(days, existing) {
     const edited = new Set(existing.filter((d) => d.edited).map((d) => d.id));
     const todo = days.filter((d) => !edited.has(d.date));
+    daysCache = null;
     for (let i = 0; i < todo.length; i += 400) {
         const batch = writeBatch(db);
         for (const d of todo.slice(i, i + 400)) batch.set(doc(db, "intercept", d.date), d);

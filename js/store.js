@@ -1,8 +1,16 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, getDocs, setDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { FIREBASE_CONFIG } from "./config.js";
 
-export const db = getFirestore(initializeApp(FIREBASE_CONFIG));
+const app = initializeApp(FIREBASE_CONFIG);
+export const db = getFirestore(app);
+
+// Firestore 보안 규칙이 로그인한 본인 계정만 읽고 쓰게 막으므로, 허브는 Google 로그인 뒤에 데이터를 읽음
+export const auth = getAuth(app);
+export const currentUser = () => new Promise((ok) => { const off = onAuthStateChanged(auth, (u) => { off(); ok(u); }); });
+export const signIn = () => signInWithPopup(auth, new GoogleAuthProvider());
+export const logOut = () => signOut(auth);
 const LOCAL_KEY = "hub_roster";
 
 // 계정 문서 형식: { account, fetched_at, data: JSON 문자열 }
