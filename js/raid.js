@@ -77,6 +77,7 @@ function statsFor(kind, acc) {
     const rewards = pcts.map(soloReward);
     return { count: list.length, top, bestPct: pcts.length ? Math.min(...pcts) : null, recent: avg(recent), all: avg(pcts),
         frame3: rewards.filter((w) => w.frame === 3).length, recentFrame3: recent.map(soloReward).filter((w) => w.frame === 3).length,
+        frames: [3, 2, 1, 0].map((f) => rewards.filter((w) => w.frame === f).length),
         dia: rewards.reduce((s, w) => s + w.dia, 0), pctCount: pcts.length };
 }
 
@@ -115,15 +116,20 @@ function renderStats() {
     const table = (kind) => {
         const solo = kind === "solo";
         return `<h3 class="sec">${KIND[kind]}</h3>
-        <div class="table-wrap"><table class="stats"><thead><tr><th class="sticky"></th><th>참여</th>${solo ? "<th>테두리3</th><th>최근 5회 테두리3</th><th>받은 다이아</th>" : ""}<th>최고 점수</th><th>최고 순위</th><th>최근 5회 평균</th><th>전체 평균</th></tr></thead><tbody>
+        <div class="table-wrap"><table class="stats"><thead><tr><th class="sticky"></th><th>참여</th>${solo
+            ? "<th>테두리3 (전체)</th><th>최근 5회 테두리3</th><th>테두리 3 · 2 · 1 · 없음</th><th>받은 다이아</th><th>최고 점수</th><th>최고 순위</th>"
+            : "<th>최고 점수</th><th>최고 순위</th><th>최근 5회 평균</th><th>전체 평균</th>"}</tr></thead><tbody>
         ${cols.map((a) => {
             const s = statsFor(kind, a);
-            if (!s) return `<tr><td class="sticky"><b>${esc(a)}</b></td><td colspan="${solo ? 8 : 5}" class="muted">기록 없음</td></tr>`;
-            return `<tr><td class="sticky"><b>${esc(a)}</b></td><td>${s.count}</td>
-                ${solo ? `<td><b>${s.frame3}</b><small class="muted">/${s.pctCount} · ${s.pctCount ? Math.round((s.frame3 / s.pctCount) * 100) : 0}%</small></td>
-                    <td><b class="${s.recentFrame3 >= 4 ? "good" : s.recentFrame3 <= 2 ? "bad" : ""}">${s.recentFrame3}/5</b></td><td>${s.dia.toLocaleString()}</td>` : ""}
-                <td>${fmtScore(s.top.b.score)} <small class="muted">${esc(title(s.top.x))}</small></td>
-                <td>${s.bestPct != null ? `${s.bestPct}%` : "-"}</td><td><b>상위 ${s.recent}%</b></td><td>상위 ${s.all}%</td></tr>`;
+            if (!s) return `<tr><td class="sticky"><b>${esc(a)}</b></td><td colspan="${solo ? 7 : 5}" class="muted">기록 없음</td></tr>`;
+            const top = `<td>${fmtScore(s.top.b.score)} <small class="muted">${esc(title(s.top.x))}</small></td><td>${s.bestPct != null ? `${s.bestPct}%` : "-"}</td>`;
+            // 솔로 레이드는 % 평균 대신 보상(테두리·다이아)으로만 보여 줌 — 평균은 옛날 시즌 하나에 크게 흔들림
+            return `<tr><td class="sticky"><b>${esc(a)}</b></td><td>${s.count}</td>${solo
+                ? `<td><b>${s.frame3}</b><small class="muted">/${s.pctCount} · ${s.pctCount ? Math.round((s.frame3 / s.pctCount) * 100) : 0}%</small></td>
+                    <td><b class="${s.recentFrame3 >= 4 ? "good" : s.recentFrame3 <= 2 ? "bad" : ""}">${s.recentFrame3}/5</b></td>
+                    <td class="frames">${s.frames.map((n, i) => `<span class="fr fr${3 - i}">${n}</span>`).join("")}</td>
+                    <td>${s.dia.toLocaleString()}</td>${top}`
+                : `${top}<td><b>상위 ${s.recent}%</b></td><td>상위 ${s.all}%</td>`}</tr>`;
         }).join("")}</tbody></table></div>`;
     };
     $("#raid-view").innerHTML = `${table("solo")}

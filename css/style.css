@@ -443,3 +443,9 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .raid-table th, .raid-table .pct, .raid-table td small { white-space: nowrap; }
 .el-stats .f3 { font-size: 1.1rem; }
 .el-stats .f3 small { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.stats td.frames { white-space: nowrap; }
+.fr { display: inline-block; min-width: 26px; text-align: center; padding: 1px 4px; margin-left: 3px; border-radius: 5px; font-size: 0.8rem; font-weight: 700; }
+.fr3 { background: var(--gold-soft); color: var(--gold); }
+.fr2 { background: var(--max-soft); color: var(--max); }
+.fr1 { background: var(--core-soft); color: var(--core); }
+.fr0 { background: var(--star-soft); color: var(--star); }
