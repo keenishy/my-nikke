@@ -441,3 +441,5 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .hist-table td, .hist-table th { text-align: center; white-space: nowrap; }
 .hist-table tr.mine td { background: var(--primary-soft); }
 .raid-table th, .raid-table .pct, .raid-table td small { white-space: nowrap; }
+.el-stats .f3 { font-size: 1.1rem; }
+.el-stats .f3 small { font-size: 0.8rem; color: var(--muted); font-weight: 600; }

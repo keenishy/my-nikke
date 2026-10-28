@@ -166,7 +166,7 @@ function renderAccountView() {
 function render() {
     if (!state.meta) return;
     renderChips();
-    document.querySelectorAll(".view-toggle button").forEach((b) => b.classList.toggle("on", b.dataset.view === state.view));
+    document.querySelectorAll("#tab-collection .view-toggle button").forEach((b) => b.classList.toggle("on", b.dataset.view === state.view));
     state.view === "nikke" ? renderMatrix() : renderAccountView();
     const times = Object.values(state.rosters).map((r) => r.fetched_at).sort();
     $("#last-sync").textContent = times.length ? `마지막 갱신 ${new Date(times[times.length - 1]).toLocaleString("ko-KR")}` : "아직 받은 데이터가 없습니다";
@@ -341,7 +341,8 @@ export async function initCollection() {
         else state.selected.has(acc) ? state.selected.delete(acc) : state.selected.add(acc);
         saveUi(); render();
     });
-    document.querySelectorAll(".view-toggle button").forEach((b) => b.addEventListener("click", () => { state.view = b.dataset.view; saveUi(); render(); }));
+    // 도감 탭 안의 보기 전환만 (다른 탭의 .view-toggle까지 잡으면 그 탭 버튼 표시가 지워짐)
+    document.querySelectorAll("#tab-collection .view-toggle button").forEach((b) => b.addEventListener("click", () => { state.view = b.dataset.view; saveUi(); render(); }));
     for (const id of ["rare", "element", "cls", "burst", "corp", "own", "sort"]) $(`#f-${id}`).addEventListener("change", (e) => { state[id] = e.target.value; render(); });
     $("#f-q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
     $("#view").addEventListener("click", (e) => { const c = e.target.closest("[data-code]")?.dataset.code; if (c) { state.editingInfo = false; openDetail(Number(c)); } });

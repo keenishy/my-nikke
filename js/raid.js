@@ -1,6 +1,6 @@
 import { ACCOUNTS } from "./config.js";
 import { ELEMENT, ELEMENT_ICON, loadNikkeList, portraitUrl, loadSoloRaidBosses } from "./meta.js";
-import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids } from "./raid-data.js";
+import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids, soloReward } from "./raid-data.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -11,6 +11,7 @@ const r = {
     view: localStorage.getItem("hub_raid_view") || "solo",
     selected: new Set(JSON.parse(localStorage.getItem("hub_raid_selected") || "null") || ACCOUNTS),
     element: "",
+    elRecent: Number(localStorage.getItem("hub_raid_el_recent")) || 0, // 0 = 전체 시즌, 10 = 최근 10시즌
     editing: null,
     chart: null,
 };
@@ -73,46 +74,58 @@ function statsFor(kind, acc) {
     const pcts = bests.map((v) => v.b.pct).filter((p) => p != null);
     const recent = pcts.slice(0, 5);
     const avg = (a) => (a.length ? (a.reduce((s, v) => s + v, 0) / a.length).toFixed(2) : "-");
-    return { count: list.length, top, bestPct: pcts.length ? Math.min(...pcts) : null, recent: avg(recent), all: avg(pcts) };
+    const rewards = pcts.map(soloReward);
+    return { count: list.length, top, bestPct: pcts.length ? Math.min(...pcts) : null, recent: avg(recent), all: avg(pcts),
+        frame3: rewards.filter((w) => w.frame === 3).length, recentFrame3: recent.map(soloReward).filter((w) => w.frame === 3).length,
+        dia: rewards.reduce((s, w) => s + w.dia, 0), pctCount: pcts.length };
 }
 
-// 약점 속성별 솔로 레이드: 계정마다 그 속성 보스에서 받은 최고 순위(상위 %)의 평균
-// 속성 필터와 상관없이 전체 솔로 레이드 기록으로 계산 (약점을 안 넣은 기록은 시즌 번호로 블라블라 보스 목록에서 찾음)
+// 약점 속성별 솔로 레이드: 그 속성이 약점인 시즌에서 테두리3(상위 3% 이내)을 몇 번 받았는지
+// 속성 필터와 상관없이 솔로 레이드 기록으로 계산 (약점을 안 넣은 기록은 시즌 번호로 블라블라 보스 목록에서 찾음)
 const ELEMENTS = ["Fire", "Water", "Wind", "Electronic", "Iron"];
 function elementTable(cols) {
-    const solo = r.raids.filter((x) => x.kind === "solo").map((x) => ({ ...x, element: x.element || r.soloBosses?.get(x.season)?.element || "" }));
+    const all = r.raids.filter((x) => x.kind === "solo").sort((a, b) => (b.season ?? 0) - (a.season ?? 0));
+    const solo = (r.elRecent ? all.slice(0, r.elRecent) : all).map((x) => ({ ...x, element: x.element || r.soloBosses?.get(x.season)?.element || "" }));
     // 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씀. 칸에 마우스를 올리면 계산에 들어간 시즌 목록이 보임
     const cell = (acc, el) => {
         const got = solo.filter((x) => x.element === el).map((x) => ({ x, pct: best(x.results?.[acc])?.pct })).filter((v) => v.pct != null)
             .sort((a, b) => (b.x.season ?? 0) - (a.x.season ?? 0));
         if (!got.length) return null;
-        return { avg: got.reduce((s, v) => s + v.pct, 0) / got.length, n: got.length, list: got.map((v) => `${title(v.x)} ${v.pct}%`).join("\n") };
+        const f3 = got.filter((v) => soloReward(v.pct).frame === 3).length;
+        return { f3, n: got.length, rate: f3 / got.length, bestPct: Math.min(...got.map((v) => v.pct)),
+            list: got.map((v) => `${title(v.x)} ${v.pct}% · 테두리${soloReward(v.pct).frame || "없음"} · ${soloReward(v.pct).dia.toLocaleString()}다이아`).join("\n") };
     };
     const noEl = solo.filter((x) => !x.element).length;
-    return `<h3 class="sec">약점 속성별 솔로 레이드 순위 <small class="muted">(그 속성이 약점인 시즌들의 평균 상위 % · 낮을수록 좋음)</small></h3>
+    return `<h3 class="sec">약점 속성별 테두리3 달성 <small class="muted">(그 속성이 약점인 시즌 중 상위 3% 이내 횟수)</small></h3>
+        <div class="filters"><div class="view-toggle" id="raid-el-recent">${[[0, "전체 시즌"], [10, "최근 10시즌"]].map(([v, l]) => `<button data-elrecent="${v}" class="${r.elRecent === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
         <div class="table-wrap"><table class="stats el-stats"><thead><tr><th class="sticky"></th>${ELEMENTS.map((el) => `<th>${elIcon(el)} ${ELEMENT[el]}</th>`).join("")}</tr></thead><tbody>
         ${cols.map((a) => {
             const cells = ELEMENTS.map((el) => cell(a, el));
-            const avgs = cells.filter(Boolean).map((c) => c.avg);
-            const [lo, hi] = [Math.min(...avgs), Math.max(...avgs)];
             return `<tr><td class="sticky"><b>${esc(a)}</b></td>${cells.map((c) => !c ? `<td class="dim">-</td>`
-                : `<td class="${avgs.length > 1 && c.avg === lo ? "el-best" : avgs.length > 1 && c.avg === hi ? "el-worst" : ""}" title="${esc(c.list)}">${pctBadge(+c.avg.toFixed(2))}<div class="muted">${c.n}시즌</div></td>`).join("")}</tr>`;
+                : `<td class="${c.rate >= 0.75 ? "el-best" : c.rate < 0.5 ? "el-worst" : ""}" title="${esc(c.list)}"><b class="f3">${c.f3}<small>/${c.n}</small></b><div class="muted">최고 ${c.bestPct}%</div></td>`).join("")}</tr>`;
         }).join("")}</tbody></table></div>
-        <p class="muted el-legend"><span class="el-key el-best"></span>그 계정이 가장 잘하는 속성 <span class="el-key el-worst"></span>가장 약한 속성 · 칸에 마우스를 올리면 계산에 들어간 시즌이 보입니다. 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씁니다.</p>
+        <p class="muted el-legend">숫자 = 테두리3 횟수 / 참여 시즌 <span class="el-key el-best"></span>75% 이상 달성 <span class="el-key el-worst"></span>절반 미만 · 칸에 마우스를 올리면 시즌별 순위·보상이 보입니다. 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씁니다.</p>
         ${noEl ? `<p class="muted">약점 속성을 알 수 없는 솔로 레이드 ${noEl}회는 빠져 있습니다.</p>` : ""}`;
 }
 
 function renderStats() {
     const cols = accs();
     $("#raid-count").textContent = "";
-    const table = (kind) => `<h3 class="sec">${KIND[kind]}</h3>
-        <div class="table-wrap"><table class="stats"><thead><tr><th class="sticky"></th><th>참여</th><th>최고 점수</th><th>최고 순위</th><th>최근 5회 평균</th><th>전체 평균</th></tr></thead><tbody>
+    // 솔로 레이드는 시즌 종료 보상 기준(테두리3 = 상위 3% 이내, 다이아)도 같이 보여 줌
+    const table = (kind) => {
+        const solo = kind === "solo";
+        return `<h3 class="sec">${KIND[kind]}</h3>
+        <div class="table-wrap"><table class="stats"><thead><tr><th class="sticky"></th><th>참여</th>${solo ? "<th>테두리3</th><th>최근 5회 테두리3</th><th>받은 다이아</th>" : ""}<th>최고 점수</th><th>최고 순위</th><th>최근 5회 평균</th><th>전체 평균</th></tr></thead><tbody>
         ${cols.map((a) => {
             const s = statsFor(kind, a);
-            if (!s) return `<tr><td class="sticky"><b>${esc(a)}</b></td><td colspan="5" class="muted">기록 없음</td></tr>`;
-            return `<tr><td class="sticky"><b>${esc(a)}</b></td><td>${s.count}</td><td>${fmtScore(s.top.b.score)} <small class="muted">${esc(title(s.top.x))}</small></td>
+            if (!s) return `<tr><td class="sticky"><b>${esc(a)}</b></td><td colspan="${solo ? 8 : 5}" class="muted">기록 없음</td></tr>`;
+            return `<tr><td class="sticky"><b>${esc(a)}</b></td><td>${s.count}</td>
+                ${solo ? `<td><b>${s.frame3}</b><small class="muted">/${s.pctCount} · ${s.pctCount ? Math.round((s.frame3 / s.pctCount) * 100) : 0}%</small></td>
+                    <td><b class="${s.recentFrame3 >= 4 ? "good" : s.recentFrame3 <= 2 ? "bad" : ""}">${s.recentFrame3}/5</b></td><td>${s.dia.toLocaleString()}</td>` : ""}
+                <td>${fmtScore(s.top.b.score)} <small class="muted">${esc(title(s.top.x))}</small></td>
                 <td>${s.bestPct != null ? `${s.bestPct}%` : "-"}</td><td><b>상위 ${s.recent}%</b></td><td>상위 ${s.all}%</td></tr>`;
         }).join("")}</tbody></table></div>`;
+    };
     $("#raid-view").innerHTML = `${table("solo")}
         ${elementTable(cols)}
         <h3 class="sec">솔로 레이드 순위 추이 (상위 %)</h3><div class="chart-box"><canvas id="raid-chart"></canvas></div>
@@ -145,7 +158,7 @@ async function drawChart() {
             datasets: accs().map((a) => ({
                 label: a, data: list.map((x) => best(x.results?.[a])?.pct ?? null),
                 borderColor: ACC_COLOR[a], backgroundColor: ACC_COLOR[a], tension: 0.3, spanGaps: true, pointRadius: 3,
-            })),
+            })).concat({ label: "테두리3 (3%)", data: list.map(() => 3), borderColor: "#ffd43b", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false }),
         },
         options: {
             responsive: true, maintainAspectRatio: false,
@@ -377,6 +390,10 @@ export async function initRaid() {
         saveUi(); render();
     });
     $("#raid-element").addEventListener("change", (e) => { r.element = e.target.value; render(); });
+    $("#raid-view").addEventListener("click", (e) => {
+        const v = e.target.closest("[data-elrecent]")?.dataset.elrecent;
+        if (v != null) { r.elRecent = Number(v); localStorage.setItem("hub_raid_el_recent", v); render(); }
+    });
     $("#raid-new").addEventListener("click", () => openEdit(null));
     $("#raid-import").addEventListener("click", runImport);
     $("#raid-view").addEventListener("click", (e) => {

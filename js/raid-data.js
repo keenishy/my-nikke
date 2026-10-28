@@ -29,6 +29,15 @@ export function best(result) {
     return { score: top.score || 0, pct: pcts.length ? Math.min(...pcts) : null, runs: runs.length, deck: top.deck || [] };
 }
 
+// 솔로 레이드 시즌 종료 보상 (상위 % 구간 → 다이아·테두리 단계). 1~200위 보상은 순위 숫자가 없어 0.5% 구간으로 계산
+const SOLO_REWARD = [[0.5, 2400, 3], [0.7, 2100, 3], [1, 1800, 3], [2, 1600, 3], [3, 1400, 3], [5, 1200, 2], [10, 1100, 2],
+    [15, 1000, 1], [20, 900, 1], [30, 800, 1], [40, 700, 0], [50, 600, 0], [60, 500, 0], [80, 400, 0], [100, 300, 0]];
+export function soloReward(pct) {
+    if (pct == null) return null;
+    const [, dia, frame] = SOLO_REWARD.find(([max]) => pct <= max) || [0, 100, 0];
+    return { dia, frame };
+}
+
 export const fmtScore = (n) => (!n ? "-" : n >= 1e8 ? `${(n / 1e8).toFixed(1)}억` : n.toLocaleString());
 export const parseScore = (s) => Number(String(s ?? "").replace(/[^0-9]/g, "")) || 0;
 export const parsePct = (s) => { const v = parseFloat(String(s ?? "").replace(/[^0-9.]/g, "")); return Number.isFinite(v) ? v : null; };
