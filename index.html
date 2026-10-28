@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>니케 허브</title>
+    <meta name="theme-color" content="#0f1117">
+    <link rel="icon" href="img/icon.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
+</head>
+<body>
+    <header class="hub-header">
+        <div class="brand">NIKKE HUB</div>
+        <nav class="hub-tabs">
+            <button class="hub-tab" data-tab="dashboard">홈</button>
+            <button class="hub-tab active" data-tab="collection">도감</button>
+            <button class="hub-tab" data-tab="gacha">가챠 기록</button>
+            <button class="hub-tab" data-tab="ranking">협작·솔레</button>
+            <button class="hub-tab" data-tab="union">유니온 레이드</button>
+            <button class="hub-tab" data-tab="interception">특특요</button>
+        </nav>
+    </header>
+
+    <main>
+        <section class="tab-panel active" id="tab-collection">
+            <div class="toolbar">
+                <div class="view-toggle">
+                    <button data-view="nikke">니케 보기</button>
+                    <button data-view="account">계정 보기</button>
+                </div>
+                <span class="muted" id="last-sync"></span>
+                <span class="spacer"></span>
+                <button class="btn primary" id="sync-btn">전체 갱신</button>
+                <button class="btn" id="settings-btn" title="설정">설정</button>
+            </div>
+            <p class="warn" id="cloud-warn" hidden>Firebase에 연결하지 못해서 이 브라우저에 저장된 데이터만 보여 줍니다.</p>
+
+            <div class="acc-chips" id="acc-chips"></div>
+
+            <div class="filters">
+                <input id="f-q" type="search" placeholder="니케 이름 검색">
+                <select id="f-rare"><option value="SSR">SSR</option><option value="SR">SR</option><option value="R">R</option><option value="">등급 전체</option></select>
+                <select id="f-element"><option value="">속성 전체</option><option value="Fire">작열</option><option value="Water">수냉</option><option value="Wind">풍압</option><option value="Iron">철갑</option><option value="Electronic">전격</option></select>
+                <select id="f-burst"><option value="">버스트 전체</option><option value="Step1">Ⅰ</option><option value="Step2">Ⅱ</option><option value="Step3">Ⅲ</option><option value="AllStep">Ⅰ~Ⅲ</option></select>
+                <select id="f-cls"><option value="">클래스 전체</option><option value="Attacker">화력형</option><option value="Defender">방어형</option><option value="Supporter">지원형</option></select>
+                <select id="f-corp"><option value="">기업 전체</option><option value="ELYSION">엘리시온</option><option value="MISSILIS">미실리스</option><option value="TETRA">테트라</option><option value="PILGRIM">필그림</option><option value="ABNORMAL">어브노멀</option></select>
+                <select id="f-own"><option value="">보유 상관없음</option><option value="any">한 계정이라도 보유</option><option value="missing">일부 계정만 보유</option><option value="none">아무도 미보유</option></select>
+                <select id="f-sort"><option value="order">최신 출시순</option><option value="cp">전투력 높은 순</option><option value="old">오래된 출시순</option><option value="name">이름순</option><option value="owned">보유 계정 많은 순</option></select>
+                <span class="muted" id="result-count"></span>
+            </div>
+
+            <div id="view"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-gacha">
+            <div class="toolbar">
+                <div class="view-toggle" id="gacha-subtabs">
+                    <button data-gview="list" class="on">배너</button>
+                    <button data-gview="stats">통계</button>
+                </div>
+                <span class="spacer"></span>
+                <button class="btn primary" id="gacha-new">+ 새 배너</button>
+                <button class="btn" id="gacha-import">기존 기록 가져오기</button>
+            </div>
+            <div class="filters">
+                <input id="g-q" type="search" placeholder="배너(니케) 이름 검색">
+                <select id="g-cat"><option value="">타입 전체</option><option>통상</option><option>한정</option><option>콜라보</option><option>필그림</option><option>오버스펙</option><option>복각</option><option>무료</option></select>
+                <select id="g-year"></select>
+                <span class="muted" id="gacha-count"></span>
+            </div>
+            <div id="gacha-view"></div>
+            <p class="muted foot-link">예전 가챠 트래커: <a href="https://keenishy.github.io/nikke-gacha-tracker/" target="_blank" rel="noopener">열기</a></p>
+            <datalist id="gacha-nikke-names"></datalist>
+            <datalist id="gacha-types"></datalist>
+        </section>
+        <section class="tab-panel" id="tab-ranking">
+            <div class="toolbar">
+                <div class="view-toggle" id="raid-subtabs">
+                    <button data-rview="solo">솔로 레이드</button>
+                    <button data-rview="coop">협동 작전</button>
+                    <button data-rview="stats">통계</button>
+                </div>
+                <span class="spacer"></span>
+                <button class="btn primary" id="raid-new">+ 새 기록</button>
+                <button class="btn" id="raid-import">기존 기록 가져오기</button>
+            </div>
+            <div class="acc-chips" id="raid-chips"></div>
+            <div class="filters">
+                <select id="raid-element"><option value="">약점 전체</option><option value="Fire">작열</option><option value="Water">수냉</option><option value="Wind">풍압</option><option value="Iron">철갑</option><option value="Electronic">전격</option></select>
+                <span class="muted" id="raid-count"></span>
+            </div>
+            <div id="raid-view"></div>
+            <p class="muted foot-link">예전 레이드 기록부: <a href="https://keenishy.github.io/nikke-ranking/" target="_blank" rel="noopener">열기</a></p>
+            <datalist id="raid-bosses"></datalist>
+        </section>
+        <section class="tab-panel" id="tab-union">
+            <div class="toolbar"><div class="view-toggle" id="union-subtabs"></div></div>
+            <div id="union-view"></div>
+        </section>
+        <section class="tab-panel" id="tab-interception">
+            <div class="toolbar">
+                <div class="view-toggle" id="ic-subtabs">
+                    <button data-icview="list">기록</button>
+                    <button data-icview="stats">통계</button>
+                </div>
+                <span class="spacer"></span>
+                <button class="btn primary" id="ic-new">+ 오늘 기록 입력</button>
+                <button class="btn" id="ic-import">기존 기록 가져오기</button>
+            </div>
+            <div class="filters">
+                <button class="btn small" id="ic-prev" title="이전 달">◀</button>
+                <select id="ic-month"></select>
+                <button class="btn small" id="ic-next" title="다음 달">▶</button>
+                <select id="ic-acc" hidden></select>
+                <select id="ic-event" hidden><option value="">일반 + 풀버데이</option><option value="normal">일반 날만</option><option value="fb">풀버데이만</option></select>
+                <span class="muted" id="ic-count"></span>
+            </div>
+            <div id="ic-view"></div>
+            <p class="muted foot-link">예전 특특요 사이트: <a href="https://keenishy.github.io/nikke-Interception-chart/" target="_blank" rel="noopener">열기</a></p>
+        </section>
+        <section class="tab-panel" id="tab-dashboard">
+            <div id="dash-view"></div>
+        </section>
+    </main>
+
+    <dialog id="detail">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <div id="detail-body"></div>
+    </dialog>
+
+    <dialog id="banner-dialog" class="wide">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <div id="banner-body"></div>
+    </dialog>
+
+    <dialog id="slot-dialog">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="slot-title"></h2>
+        <div id="slot-drops"></div>
+        <div class="row wrap" id="slot-add">
+            <button class="btn drop-btn pickup" data-add="pickup">+ 픽업</button>
+            <button class="btn drop-btn spook" data-add="spook">+ 픽뚫</button>
+            <button class="btn drop-btn pilgrim" data-add="pilgrim">+ 필그림</button>
+            <button class="btn drop-btn gold" data-add="gold">+ 골티</button>
+        </div>
+        <div class="row wrap" id="slot-blank">
+            <label><input type="radio" name="slot-blank" value="">SSR 있음/해당 없음</label>
+            <label><input type="radio" name="slot-blank" value="blank">꽝</label>
+            <label><input type="radio" name="slot-blank" value="blue">올블루</label>
+            <label><input type="radio" name="slot-blank" value="purple">올퍼플</label>
+        </div>
+        <input id="slot-memo" class="full" placeholder="메모">
+        <div class="row end">
+            <button class="btn" id="slot-clear">비우기</button>
+            <button class="btn primary" id="slot-save">저장</button>
+        </div>
+    </dialog>
+
+    <dialog id="info-dialog">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="info-title">새 배너</h2>
+        <form id="info-form" class="form">
+            <label>니케 이름<input name="name" list="gacha-nikke-names" placeholder="예: 앨리스 : 원더랜드 바니" autocomplete="off" required></label>
+            <label>출시 타입<input name="type" list="gacha-types" placeholder="목록에서 고르거나 직접 입력" autocomplete="off"></label>
+            <label>시작일<input name="start" type="date"></label>
+            <label>모집 기간 (원문, 선택)<input name="period" placeholder="모집 기간 : 2026년 7월 30일(목) ~ ..."></label>
+            <div class="row end">
+                <button type="button" class="btn danger" id="info-delete" hidden>배너 삭제</button>
+                <button type="submit" class="btn primary">저장</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="raid-dialog" class="wide">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="raid-title">새 레이드 기록</h2>
+        <form id="raid-form" class="form">
+            <div class="form-grid">
+                <label>종류<select name="kind"><option value="solo">솔로 레이드</option><option value="coop">협동 작전</option></select></label>
+                <label class="solo-only">시즌<input name="season" type="number" min="1"></label>
+                <label>보스<input name="boss" list="raid-bosses" autocomplete="off" placeholder="이전 보스는 목록에서 선택"></label>
+                <label>약점 속성<select name="element"><option value="">-</option><option value="Fire">작열</option><option value="Water">수냉</option><option value="Wind">풍압</option><option value="Iron">철갑</option><option value="Electronic">전격</option></select></label>
+                <label class="solo-only">영어 표기<input name="bossEn"></label>
+                <label>시작일<input name="start" type="date"></label>
+                <label>종료일<input name="end" type="date"></label>
+                <label class="coop-only">조합 / 덱<input name="deck" placeholder="아크흑리메"></label>
+                <label class="span2">전체 메모<input name="note"></label>
+            </div>
+            <div id="raid-accounts" class="raid-accounts"></div>
+            <div class="row end">
+                <button type="button" class="btn danger" id="raid-delete" hidden>기록 삭제</button>
+                <button type="submit" class="btn primary">저장</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="deck-dialog">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="deck-title">덱 선택</h2>
+        <div class="deck-picked" id="deck-picked"></div>
+        <div class="row wrap deck-tools">
+            <input id="deck-q" type="search" placeholder="니케 이름 검색">
+            <label><input type="checkbox" id="deck-owned" checked>이 계정 보유 니케만</label>
+        </div>
+        <div class="deck-grid" id="deck-grid"></div>
+        <div class="row end">
+            <button class="btn" id="deck-clear">비우기</button>
+            <button class="btn primary" id="deck-ok">확인</button>
+        </div>
+    </dialog>
+
+    <dialog id="ic-dialog" class="wide">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="ic-dialog-title">특특요 기록</h2>
+        <div class="row wrap ic-top">
+            <label>날짜<input type="date" id="ic-date"></label>
+            <label>보스 전체 적용<select id="ic-all-boss"></select></label>
+            <button type="button" class="btn" id="ic-all-fb">풀버데이 전체 켜기/끄기</button>
+        </div>
+        <div id="ic-accounts" class="ic-accounts"></div>
+        <div class="row end"><span class="muted" id="ic-status"></span><button class="btn primary" id="ic-save">저장</button></div>
+    </dialog>
+
+    <dialog id="settings">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2>블라블라 연동 설정</h2>
+        <p class="muted">Cloudflare Worker의 ACCESS_KEY를 넣어 주세요. 이 브라우저에만 저장됩니다.</p>
+        <input id="key-input" type="password" placeholder="ACCESS_KEY">
+        <div class="row"><button class="btn primary" id="key-test">저장하고 연결 확인</button></div>
+        <p id="key-status" class="muted"></p>
+    </dialog>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
