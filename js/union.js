@@ -84,7 +84,7 @@ function render() {
             <button class="btn" id="un-load-all">안 받은 시즌 모두 불러오기</button>
             <span class="muted" id="un-raid-status"></span>
         </div>
-        <div id="un-raid">${u.raids[key] ? raidHtml(u.raids[key]) : `<p class="muted">${season ? "아직 불러오지 않은 시즌입니다." : ""} 상세 기록은 블라블라에 로그인한 계정(케니)이 속한 유니온만 받을 수 있습니다.</p>`}</div>
+        <div id="un-raid">${u.raids[key] ? raidHtml(u.raids[key]) : `<p class="muted">${season ? "아직 불러오지 않은 시즌입니다." : ""} 상세 기록은 이 유니온 소속 계정의 블라블라 쿠키가 Cloudflare에 있어야 받을 수 있습니다 (LOVEABLE은 기본 쿠키, 나머지는 BLA_COOKIE_유니온번호).</p>`}</div>
 
         <h3 class="sec">메모</h3>
         <textarea id="un-memo" rows="3" class="union-memo" placeholder="유니온 규칙, 공략, 기타 메모">${esc(u.memos[u.current] || "")}</textarea>

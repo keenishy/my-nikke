@@ -316,7 +316,8 @@ async function testKey() {
     $("#key-status").textContent = "확인 중…";
     try {
         const r = await checkWorker();
-        $("#key-status").textContent = r.cookie === "ok" ? `연결 정상 · 블라블라 쿠키 정상 · 계정 ${r.accounts.length}개` : `연결은 됐지만 블라블라 쿠키가 ${r.cookie}입니다. Cloudflare의 BLA_COOKIE를 새로 넣어 주세요.`;
+        const extra = Object.entries(r.union_cookies || {}).map(([k, v]) => `${k} ${v}`).join(" · ");
+        $("#key-status").textContent = (r.cookie === "ok" ? `연결 정상 · 블라블라 쿠키 정상 · 계정 ${r.accounts.length}개` : `연결은 됐지만 블라블라 쿠키가 ${r.cookie}입니다. Cloudflare의 BLA_COOKIE를 새로 넣어 주세요.`) + (extra ? ` · 유니온 쿠키: ${extra}` : "");
     } catch (e) { $("#key-status").textContent = `실패: ${e.message}`; }
 }
 

@@ -1,7 +1,9 @@
 // 블라블라 중계 서버 (Cloudflare Worker)
 //
 // 필요한 비밀값 (Cloudflare 대시보드 → Worker → Settings → Variables and Secrets):
-//   BLA_COOKIE  : 블라블라에 로그인한 브라우저의 cookie 헤더 값 전체
+//   BLA_COOKIE  : 블라블라에 로그인한 브라우저의 cookie 헤더 값 전체 (기본 계정)
+//   BLA_COOKIE_<유니온id> : (선택) 그 유니온 소속 계정의 cookie. 유니온 레이드·멤버는 소속 계정으로만 조회됨
+//                    예: BLA_COOKIE_7811, BLA_COOKIE_22260, BLA_COOKIE_29131
 //   ACCOUNTS    : {"계정이름":"1234567890", ...}  (계정 이름 → openid 숫자)
 //   ACCESS_KEY  : 아무 긴 문자열. 허브가 요청할 때 ?key= 로 같이 보냄
 //
@@ -25,7 +27,7 @@ const cors = {
 
 const reply = (body, status = 200) => new Response(typeof body === "string" ? body : JSON.stringify(body), { status, headers: cors });
 
-async function post(env, path, body) {
+async function post(env, path, body, cookie = env.BLA_COOKIE) {
   const r = await fetch(API + path, {
     method: "POST",
     headers: {
@@ -36,7 +38,7 @@ async function post(env, path, body) {
       "Origin": "https://www.blablalink.com",
       "Referer": "https://www.blablalink.com/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
-      "Cookie": env.BLA_COOKIE,
+      "Cookie": cookie,
     },
     body: JSON.stringify(body),
   });
@@ -51,10 +53,10 @@ const codeOf = (text) => {
 
 // 블라블라는 동시 요청을 "request too frequently"(212000)로 거절하므로 하나씩 보내고, 거절되면 잠깐 쉬었다 재시도
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function calm(env, path, body) {
+async function calm(env, path, body, cookie) {
   for (let tries = 0; ; tries++) {
     await sleep(300);
-    const text = await post(env, path, body);
+    const text = await post(env, path, body, cookie);
     if (codeOf(text) !== 212000 || tries >= 4) return text;
     await sleep(1000 * (tries + 1));
   }
@@ -72,7 +74,11 @@ export default {
 
     if (url.pathname === "/") {
       const me = await post(env, "game/proxy/Game/GetSavedRoleInfo", {});
-      return reply({ accounts: Object.keys(accounts), cookie: codeOf(me) === 0 ? "ok" : "만료 또는 잘못됨" });
+      const extra = {};
+      for (const k of Object.keys(env).filter((k) => /^BLA_COOKIE_\d+$/.test(k))) {
+        extra[k] = codeOf(await calm(env, "game/proxy/Game/GetSavedRoleInfo", {}, env[k])) === 0 ? "ok" : "만료 또는 잘못됨";
+      }
+      return reply({ accounts: Object.keys(accounts), cookie: codeOf(me) === 0 ? "ok" : "만료 또는 잘못됨", union_cookies: extra });
     }
 
     if (url.pathname === "/sync") {
@@ -119,19 +125,26 @@ export default {
       return reply({ fetched_at: new Date().toISOString(), members, unions });
     }
 
+    // 유니온 레이드·멤버는 로그인 계정이 속한 유니온만 보이므로, 유니온별 쿠키가 있으면 그걸 씀
+    const guildCookie = (guild) => env[`BLA_COOKIE_${guild}`] || env.BLA_COOKIE;
+    const notMember = (guild) => reply({ error: `이 유니온 소속 계정의 블라블라 쿠키가 필요합니다. Cloudflare에 BLA_COOKIE_${guild} 비밀값을 넣어 주세요.` }, 403);
+    const expired = (guild) => reply({ error: `블라블라 로그인 쿠키가 만료됐습니다. ${env[`BLA_COOKIE_${guild}`] ? `BLA_COOKIE_${guild}` : "BLA_COOKIE"}를 다시 넣어 주세요.` }, 401);
+
     if (url.pathname === "/union-raid") {
       const guild = url.searchParams.get("guild");
       const season = url.searchParams.get("season");
       if (!/^\d+$/.test(guild || "") || !/^\d+$/.test(season || "")) return reply({ error: "guild, season 값이 필요합니다" }, 400);
       // 진행 중인 시즌은 다른 API를 씀 (블라블라 유니온 레이드 페이지와 같은 방식)
       const live = url.searchParams.get("live") === "1";
-      const me = Object.values(accounts)[0];
+      const cookie = guildCookie(guild);
+      const me = (cookie.match(/game_openid=(\d+)/) || [])[1] || Object.values(accounts)[0];
       const [raid, level] = live
-        ? [await calm(env, "game/proxy/Game/GetUnionRaidData", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }),
-           await calm(env, "game/proxy/Game/GetUnionRaidLevelInfo", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me })]
-        : [await calm(env, "game/proxy/Game/GetUnionRaidDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }),
-           await calm(env, "game/proxy/Game/GetUnionRaidLevelDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season })];
-      if (codeOf(raid) === 1303028) return reply({ error: "로그인한 블라블라 계정이 이 유니온 소속이 아니라서 상세 기록을 볼 수 없습니다." }, 403);
+        ? [await calm(env, "game/proxy/Game/GetUnionRaidData", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie),
+           await calm(env, "game/proxy/Game/GetUnionRaidLevelInfo", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie)]
+        : [await calm(env, "game/proxy/Game/GetUnionRaidDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie),
+           await calm(env, "game/proxy/Game/GetUnionRaidLevelDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie)];
+      if (codeOf(raid) === 1303028) return notMember(guild);
+      if (codeOf(raid) === 300001) return expired(guild);
       if (codeOf(raid) !== 0) return reply({ error: "유니온 레이드 기록을 받지 못했습니다", detail: raid.slice(0, 300) }, 502);
       return reply(`{"guild":${JSON.stringify(guild)},"season":${JSON.stringify(season)},"fetched_at":${JSON.stringify(new Date().toISOString())},"raid":${raid},"level":${level}}`);
     }
@@ -139,8 +152,9 @@ export default {
     if (url.pathname === "/union-members") {
       const guild = url.searchParams.get("guild");
       if (!/^\d+$/.test(guild || "")) return reply({ error: "guild 값이 필요합니다" }, 400);
-      const text = await calm(env, "game/proxy/Game/GetGuildMembers", { guild_id: guild, nikke_area_id: AREA });
-      if (codeOf(text) === 1303028) return reply({ error: "로그인한 블라블라 계정이 이 유니온 소속이 아니라서 멤버 목록을 볼 수 없습니다." }, 403);
+      const text = await calm(env, "game/proxy/Game/GetGuildMembers", { guild_id: guild, nikke_area_id: AREA }, guildCookie(guild));
+      if (codeOf(text) === 1303028) return notMember(guild);
+      if (codeOf(text) === 300001) return expired(guild);
       if (codeOf(text) !== 0) return reply({ error: "멤버 목록을 받지 못했습니다", detail: text.slice(0, 300) }, 502);
       const items = JSON.parse(text).data?.items || [];
       return reply({ guild, fetched_at: new Date().toISOString(),
