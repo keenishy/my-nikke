@@ -40,6 +40,8 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 .view-toggle { display: inline-flex; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
 .view-toggle button { border: none; background: none; padding: 6px 14px; border-radius: 7px; cursor: pointer; font-weight: 600; color: var(--muted); }
 .view-toggle button.on { background: var(--primary); color: #fff; }
+/* 버튼을 빠르게 여러 번 눌러도 글자가 파랗게 선택돼 '전부 켜진 것처럼' 보이지 않게 */
+button, .btn, .chip, .hub-tab, summary { user-select: none; -webkit-user-select: none; }
 .btn { border: 1px solid var(--border); background: var(--card); padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn:disabled { opacity: 0.6; cursor: progress; }
@@ -199,7 +201,7 @@ dialog.wide { width: min(1200px, calc(100vw - 24px)); }
 /* ---------- 레이드 ---------- */
 [hidden] { display: none !important; }
 .raid-table { border-collapse: collapse; width: 100%; }
-.raid-table th, .raid-table td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: center; vertical-align: top; font-size: 0.85rem; }
+.raid-table th, .raid-table td { border-bottom: 1px solid var(--border); padding: 8px 8px; text-align: center; vertical-align: top; font-size: 0.85rem; }
 .raid-table th { position: sticky; top: 0; background: var(--card); z-index: 1; }
 .raid-table .sticky { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 2; }
 .raid-table th.sticky { z-index: 3; }
@@ -209,15 +211,15 @@ dialog.wide { width: min(1200px, calc(100vw - 24px)); }
 .raid-table .rel { white-space: nowrap; }
 .raid-table .rel .el { width: 18px; height: 18px; }
 .raid-table .rel .muted { font-size: 0.72rem; }
-.raid-table .rdate { white-space: nowrap; color: var(--muted); }
-.raid-table .rnote-col { text-align: left; min-width: 180px; max-width: 280px; }
-.rnote-full { font-size: 0.78rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
+.raid-table .rdate { color: var(--muted); min-width: 64px; }
+.raid-table .rnote-col { text-align: left; min-width: 160px; }
+.rnote-full { font-size: 0.78rem; color: var(--muted); white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
 .raid-table tbody tr { cursor: pointer; }
 .raid-table tbody tr:hover td { background: var(--hover); }
 .raid-table td.dim { color: var(--faint); }
 .rt { display: flex; align-items: center; gap: 6px; }
 .rnote, .rmemo { font-size: 0.72rem; color: var(--muted); margin-top: 3px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.raid-table td .rmemo { max-width: 120px; margin: 3px auto 0; }
+.raid-table td .rmemo { max-width: 120px; margin: 3px auto 0; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
 .pct { display: inline-block; font-size: 0.72rem; font-weight: 700; border-radius: 5px; padding: 1px 6px; margin-top: 3px; }
 .pct.top1 { background: var(--gold-soft); color: var(--gold); }
 .pct.top3 { background: var(--max-soft); color: var(--max); }
@@ -434,4 +436,3 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .hist-table td, .hist-table th { text-align: center; white-space: nowrap; }
 .hist-table tr.mine td { background: var(--primary-soft); }
 .raid-table th, .raid-table .pct, .raid-table td small { white-space: nowrap; }
-.raid-table td:not(.sticky):not(.rnote-col):not(.rel):not(.rdate) { min-width: 92px; }
