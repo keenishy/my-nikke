@@ -75,13 +75,14 @@ function statsFor(kind, acc) {
     const recent = pcts.slice(0, 5);
     const avg = (a) => (a.length ? (a.reduce((s, v) => s + v, 0) / a.length).toFixed(2) : "-");
     const rewards = pcts.map(soloReward);
-    return { count: list.length, top, bestPct: pcts.length ? Math.min(...pcts) : null, recent: avg(recent), all: avg(pcts),
+    const bestRun = bests.filter((v) => v.b.pct != null).reduce((m, v) => (!m || v.b.pct < m.b.pct ? v : m), null);
+    return { count: list.length, top, bestPct: bestRun?.b.pct ?? null, bestX: bestRun?.x, recent: avg(recent), all: avg(pcts),
         frame3: rewards.filter((w) => w.frame === 3).length, recentFrame3: recent.map(soloReward).filter((w) => w.frame === 3).length,
         frames: [3, 2, 1, 0].map((f) => rewards.filter((w) => w.frame === f).length),
         dia: rewards.reduce((s, w) => s + w.dia, 0), pctCount: pcts.length };
 }
 
-// 약점 속성별 솔로 레이드: 그 속성이 약점인 시즌에서 테두리3(상위 3% 이내)을 몇 번 받았는지
+// 속성별 3% 달성: 그 속성이 약점인 시즌에서 상위 3% 이내(시즌 종료 테두리3)에 몇 번 들었는지
 // 속성 필터와 상관없이 솔로 레이드 기록으로 계산 (약점을 안 넣은 기록은 시즌 번호로 블라블라 보스 목록에서 찾음)
 const ELEMENTS = ["Fire", "Water", "Wind", "Electronic", "Iron"];
 function elementTable(cols) {
@@ -94,10 +95,10 @@ function elementTable(cols) {
         if (!got.length) return null;
         const f3 = got.filter((v) => soloReward(v.pct).frame === 3).length;
         return { f3, n: got.length, rate: f3 / got.length, bestPct: Math.min(...got.map((v) => v.pct)),
-            list: got.map((v) => `${title(v.x)} ${v.pct}% · 테두리${soloReward(v.pct).frame || "없음"} · ${soloReward(v.pct).dia.toLocaleString()}다이아`).join("\n") };
+            list: got.map((v) => `${title(v.x)} ${v.pct}%${v.pct <= 3 ? " · in 3%" : ""} · ${soloReward(v.pct).dia.toLocaleString()}다이아`).join("\n") };
     };
     const noEl = solo.filter((x) => !x.element).length;
-    return `<h3 class="sec">약점 속성별 테두리3 달성 <small class="muted">(그 속성이 약점인 시즌 중 상위 3% 이내 횟수)</small></h3>
+    return `<h3 class="sec">속성별 3% 달성 <small class="muted">(그 속성이 약점인 시즌 중 상위 3% 이내 횟수)</small></h3>
         <div class="filters"><div class="view-toggle" id="raid-el-recent">${[[0, "전체 시즌"], [10, "최근 10시즌"]].map(([v, l]) => `<button data-elrecent="${v}" class="${r.elRecent === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
         <div class="table-wrap"><table class="stats el-stats"><thead><tr><th class="sticky"></th>${ELEMENTS.map((el) => `<th>${elIcon(el)} ${ELEMENT[el]}</th>`).join("")}</tr></thead><tbody>
         ${cols.map((a) => {
@@ -105,31 +106,29 @@ function elementTable(cols) {
             return `<tr><td class="sticky"><b>${esc(a)}</b></td>${cells.map((c) => !c ? `<td class="dim">-</td>`
                 : `<td class="${c.rate >= 0.75 ? "el-best" : c.rate < 0.5 ? "el-worst" : ""}" title="${esc(c.list)}"><b class="f3">${c.f3}<small>/${c.n}</small></b><div class="muted">최고 ${c.bestPct}%</div></td>`).join("")}</tr>`;
         }).join("")}</tbody></table></div>
-        <p class="muted el-legend">숫자 = 테두리3 횟수 / 참여 시즌 <span class="el-key el-best"></span>75% 이상 달성 <span class="el-key el-worst"></span>절반 미만 · 칸에 마우스를 올리면 시즌별 순위·보상이 보입니다. 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씁니다.</p>
+        <p class="muted el-legend">숫자 = in 3% 횟수 / 참여 시즌 <span class="el-key el-best"></span>75% 이상 달성 <span class="el-key el-worst"></span>절반 미만 · 칸에 마우스를 올리면 시즌별 순위·보상이 보입니다. 한 시즌에 여러 번 쳤으면 가장 좋은 순위만 씁니다.</p>
         ${noEl ? `<p class="muted">약점 속성을 알 수 없는 솔로 레이드 ${noEl}회는 빠져 있습니다.</p>` : ""}`;
 }
 
 function renderStats() {
     const cols = accs();
     $("#raid-count").textContent = "";
-    // 솔로 레이드는 시즌 종료 보상 기준(테두리3 = 상위 3% 이내, 다이아)도 같이 보여 줌
+    // 솔로 레이드는 % 평균 대신 in 3%(시즌 종료 테두리3 기준) 횟수와 누적 다이아로 보여 줌 — 평균은 옛날 시즌 하나에 크게 흔들림
     const table = (kind) => {
         const solo = kind === "solo";
+        const bestCell = (s) => `<td>${s.bestPct != null ? `<b>${s.bestPct}%</b> <small class="muted">${esc(title(s.bestX))}</small>` : "-"}</td>`;
         return `<h3 class="sec">${KIND[kind]}</h3>
-        <div class="table-wrap"><table class="stats"><thead><tr><th class="sticky"></th><th>참여</th>${solo
-            ? "<th>테두리3 (전체)</th><th>최근 5회 테두리3</th><th>테두리 3 · 2 · 1 · 없음</th><th>받은 다이아</th><th>최고 점수</th><th>최고 순위</th>"
+        <div class="table-wrap"><table class="stats center"><thead><tr><th class="sticky">계정</th><th>참여</th>${solo
+            ? "<th>in 3%</th><th>최근 5회 in 3%</th><th>누적 다이아</th><th>최고 순위</th>"
             : "<th>최고 점수</th><th>최고 순위</th><th>최근 5회 평균</th><th>전체 평균</th>"}</tr></thead><tbody>
         ${cols.map((a) => {
             const s = statsFor(kind, a);
-            if (!s) return `<tr><td class="sticky"><b>${esc(a)}</b></td><td colspan="${solo ? 7 : 5}" class="muted">기록 없음</td></tr>`;
-            const top = `<td>${fmtScore(s.top.b.score)} <small class="muted">${esc(title(s.top.x))}</small></td><td>${s.bestPct != null ? `${s.bestPct}%` : "-"}</td>`;
-            // 솔로 레이드는 % 평균 대신 보상(테두리·다이아)으로만 보여 줌 — 평균은 옛날 시즌 하나에 크게 흔들림
+            if (!s) return `<tr><td class="sticky"><b>${esc(a)}</b></td><td colspan="${solo ? 5 : 5}" class="muted">기록 없음</td></tr>`;
             return `<tr><td class="sticky"><b>${esc(a)}</b></td><td>${s.count}</td>${solo
                 ? `<td><b>${s.frame3}</b><small class="muted">/${s.pctCount} · ${s.pctCount ? Math.round((s.frame3 / s.pctCount) * 100) : 0}%</small></td>
                     <td><b class="${s.recentFrame3 >= 4 ? "good" : s.recentFrame3 <= 2 ? "bad" : ""}">${s.recentFrame3}/5</b></td>
-                    <td class="frames">${s.frames.map((n, i) => `<span class="fr fr${3 - i}">${n}</span>`).join("")}</td>
-                    <td>${s.dia.toLocaleString()}</td>${top}`
-                : `${top}<td><b>상위 ${s.recent}%</b></td><td>상위 ${s.all}%</td>`}</tr>`;
+                    <td>${s.dia.toLocaleString()}</td>${bestCell(s)}`
+                : `<td>${fmtScore(s.top.b.score)} <small class="muted">${esc(title(s.top.x))}</small></td>${bestCell(s)}<td><b>상위 ${s.recent}%</b></td><td>상위 ${s.all}%</td>`}</tr>`;
         }).join("")}</tbody></table></div>`;
     };
     $("#raid-view").innerHTML = `${table("solo")}
@@ -164,7 +163,7 @@ async function drawChart() {
             datasets: accs().map((a) => ({
                 label: a, data: list.map((x) => best(x.results?.[a])?.pct ?? null),
                 borderColor: ACC_COLOR[a], backgroundColor: ACC_COLOR[a], tension: 0.3, spanGaps: true, pointRadius: 3,
-            })).concat({ label: "테두리3 (3%)", data: list.map(() => 3), borderColor: "#ffd43b", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false }),
+            })).concat({ label: "in 3%", data: list.map(() => 3), borderColor: "#ffd43b", borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false }),
         },
         options: {
             responsive: true, maintainAspectRatio: false,

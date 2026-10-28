@@ -449,3 +449,5 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .fr2 { background: var(--max-soft); color: var(--max); }
 .fr1 { background: var(--core-soft); color: var(--core); }
 .fr0 { background: var(--star-soft); color: var(--star); }
+.stats.center th, .stats.center td { text-align: center; }
+.stats.center .sticky { text-align: left; }
