@@ -368,7 +368,8 @@ td .dks { margin-top: 4px; }
 .info-story { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .info-story input { flex: 1; min-width: 180px; border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; background: var(--card); color: var(--text); }
 .newtag { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 0.7rem; font-weight: 800; color: var(--warn); }
-.dash-links { display: flex; gap: 8px; margin-bottom: 12px; }
+.dash-links { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+#dash-view .warn { margin: 0 0 12px; line-height: 1.6; }
 .dash-links a { text-decoration: none; color: var(--text); }
 
 /* ---------- 아이콘·등급 색·옵션 배지 (이전 도감 스타일) ---------- */
