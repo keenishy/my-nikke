@@ -5,6 +5,7 @@ import { ACCOUNTS } from "./config.js";
 // 배너 문서 (gacha_banners/{id}):
 // { name, element, type, period, start: "YYYY-MM-DD"|"", seq, legacy, edited,
 //   results: { 계정: { "10": 칸, "20": 칸, ... } } }
+// 매일 무료 1뽑 배너는 daily: true, end: 마지막 날(05시 기준)이고 칸 키가 날짜 ("2026-10-29": 칸, 단차 1회)
 // 칸(10연차 1회): { d: [{ t: "pickup"|"spook"|"pilgrim"|"gold", n: 이름/장수, x: 중복 }], b: ""|"blank"|"blue"|"purple", m: 메모 }
 
 export const DROP = {
@@ -15,7 +16,7 @@ export const DROP = {
 };
 export const BLANK = { blank: "꽝", blue: "올블루", purple: "올퍼플" };
 
-export const BANNER_TYPES = ["통상 출시", "통상 이격 출시", "한정 출시", "한정 이격 출시", "한정 복각", "한정 이격 복각", "콜라보 한정 출시", "콜라보 한정 복각", "필그림 픽업", "오버스펙 출시", "오버스펙 복각", "무료 모집"];
+export const BANNER_TYPES = ["통상 출시", "통상 이격 출시", "한정 출시", "한정 이격 출시", "한정 복각", "한정 이격 복각", "콜라보 한정 출시", "콜라보 한정 복각", "필그림 픽업", "오버스펙 출시", "오버스펙 복각", "무료 모집", "매일 무료 1뽑"];
 
 // 통계용 큰 분류
 export function typeCategory(type = "") {
@@ -34,11 +35,33 @@ export function parseStart(text = "") {
     return m ? `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}` : "";
 }
 
+// 모집 기간 원문의 "~" 뒤 날짜 = 끝나는 날. 05시 전에 끝나면 그 전날이 마지막 뽑기 날
+export function parseEnd(text = "") {
+    const m = text.split("~")[1]?.match(/(20\d\d)\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})[^\d]*(?:(\d{1,2}):\d\d)?/);
+    if (!m) return "";
+    const d = new Date(Date.UTC(m[1], m[2] - 1, m[3]));
+    if (m[4] != null && Number(m[4]) < 5) d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+}
+
+// 시작일~끝날(오늘 넘지 않게) 날짜 목록
+export function dailyDates(b, today) {
+    const out = [];
+    if (!b.start) return out;
+    const last = b.end && b.end < today ? b.end : today;
+    for (let d = new Date(`${b.start}T00:00:00Z`); d.toISOString().slice(0, 10) <= last; d.setUTCDate(d.getUTCDate() + 1)) out.push(d.toISOString().slice(0, 10));
+    return out;
+}
+
+export const isActiveDaily = (b, today) => b.daily && b.start && b.start <= today && (!b.end || today <= b.end);
+
 // 계정별 요약: 총 연차 = 기록된 가장 큰 연차 번호 (기존 트래커와 같은 방식)
-export function accountSummary(slots = {}) {
+// 매일 무료 1뽑은 기록한 날 수가 곧 뽑은 횟수, 첫 픽업은 몇 번째 뽑기였는지
+export function accountSummary(slots = {}, daily = false) {
     const s = { pulls: 0, pickup: 0, spook: 0, pilgrim: 0, gold: 0, firstPickup: 0 };
+    const keys = Object.keys(slots).sort();
     for (const [key, slot] of Object.entries(slots)) {
-        const n = Number(key);
+        const n = daily ? keys.indexOf(key) + 1 : Number(key);
         s.pulls = Math.max(s.pulls, n);
         for (const d of slot.d || []) {
             if (d.t === "gold") s.gold += parseInt(d.n) || 1;

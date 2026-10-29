@@ -2,7 +2,7 @@ import { ACCOUNTS } from "./config.js";
 import { loadNikkeList, portraitUrl } from "./meta.js";
 import { loadDays, gameDate, runCountFor, expectedOf, actualOf, excludedFromDist } from "./intercept-data.js";
 import { loadRaids, best, fmtScore } from "./raid-data.js";
-import { loadBanners, accountSummary } from "./gacha-data.js";
+import { loadBanners, accountSummary, isActiveDaily } from "./gacha-data.js";
 import { openTodayEntry } from "./intercept.js";
 import { checkWorker, getAccessKey } from "./sync.js";
 import { downloadBackup, readBackup, restoreBackup } from "./backup.js";
@@ -56,7 +56,7 @@ function raidCard(raids, kind, title) {
 
 function gachaCard(banners, meta) {
     const byName = new Map([...meta.values()].map((n) => [n.name.replace(/\s/g, ""), n]));
-    const latest = banners.filter((b) => b.start).sort((a, b) => b.start.localeCompare(a.start)).slice(0, 3);
+    const latest = banners.filter((b) => b.start && !b.daily).sort((a, b) => b.start.localeCompare(a.start)).slice(0, 3);
     const body = latest.map((b) => {
         const n = byName.get(b.name.replace(/\s/g, ""));
         return `<div class="dash-banner">${n ? `<img src="${portraitUrl(n.resource)}" alt="">` : `<div class="noimg"></div>`}
@@ -64,11 +64,25 @@ function gachaCard(banners, meta) {
             <div class="bacc">${ACCOUNTS.map((a) => {
                 const slots = b.results?.[a];
                 if (!slots || !Object.keys(slots).length) return `<span class="bchip none">${esc(a)} -</span>`;
-                const s = accountSummary(slots);
+                const s = accountSummary(slots, b.daily);
                 return `<span class="bchip ${s.pickup ? "hit" : "miss"}">${esc(a)} <b>${s.pulls}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
             }).join("")}</div></div></div>`;
     }).join("") || `<p class="muted">배너가 없습니다.</p>`;
     return card("최근 가챠", body);
+}
+
+// 진행 중인 매일 무료 1뽑: 계정마다 오늘 몇 개 뽑았는지
+function dailyCard(banners) {
+    const today = gameDate();
+    const active = banners.filter((b) => isActiveDaily(b, today));
+    if (!active.length) return "";
+    const done = (a) => active.filter((b) => b.results?.[a]?.[today]).length;
+    const total = ACCOUNTS.reduce((t, a) => t + done(a), 0);
+    const rows = ACCOUNTS.map((a) => `<tr class="${done(a) < active.length ? "todo" : ""}"><td>${esc(a)}</td><td>${done(a)}/${active.length}</td>
+        <td>${active.map((b) => { const x = b.results?.[a]?.[today]; return x ? (x.d?.length ? `<b class="good">${esc(b.name)} SSR</b>` : `<span class="muted">꽝</span>`) : `<span class="muted">-</span>`; }).join(" · ")}</td></tr>`).join("");
+    return card(`오늘 무료 1뽑 <small class="muted">${active.length}개 배너 · ${total}/${active.length * ACCOUNTS.length}</small>`,
+        `<table class="dash-table"><tbody>${rows}</tbody></table>`,
+        `<button class="btn primary small" id="dash-daily-entry">입력하기</button>`);
 }
 
 function accountCard(rosters, meta) {
@@ -115,6 +129,7 @@ export async function renderDashboard() {
         <label class="btn" title="백업 파일로 기록을 되돌립니다">백업 복원<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
     <div class="dash-grid">
         ${interceptCard(days, rosters)}
+        ${dailyCard(banners)}
         ${interceptMonthCard(days)}
         ${raidCard(raids, "solo", "최근 솔로 레이드")}
         ${raidCard(raids, "coop", "최근 협동 작전")}
@@ -144,6 +159,7 @@ export async function renderDashboard() {
             location.reload();
         } catch (err) { status.textContent = `복원하지 못했습니다: ${err.message}`; }
     });
+    $("#dash-daily-entry")?.addEventListener("click", () => document.querySelector('.hub-tab[data-tab="gacha"]').click());
     $("#dash-ic-entry")?.addEventListener("click", () => {
         document.querySelector('.hub-tab[data-tab="interception"]').click();
         openTodayEntry();

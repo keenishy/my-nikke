@@ -2,6 +2,7 @@ import { ACCOUNTS } from "./config.js";
 import { loadNikkeList, portraitUrl, loadRoleData, nikkeIcons, rareClass, ELEMENT, ELEMENT_ICON } from "./meta.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./store.js";
+import { gameDate } from "./intercept-data.js";
 
 // 배너 상단에 스쿼드·이벤트 스토리(도감 상세에서 입력한 것)를 나중에 채움
 async function fillBannerExtra(n) {
@@ -14,7 +15,7 @@ async function fillBannerExtra(n) {
     el.textContent = [role?.squad_detail?.squad_name && `스쿼드 ${role.squad_detail.squad_name}`, note.story && `스토리 ${note.story}`].filter(Boolean).join(" · ");
 }
 import {
-    DROP, BLANK, BANNER_TYPES, typeCategory, parseStart, accountSummary,
+    DROP, BLANK, BANNER_TYPES, typeCategory, parseStart, parseEnd, dailyDates, isActiveDaily, accountSummary,
     loadBanners, saveBannerInfo, saveSlot, deleteBanner, newBannerId,
     buildLegacyBanners, importLegacy, loadReleaseDates,
 } from "./gacha-data.js";
@@ -31,13 +32,16 @@ const g = {
     q: "", cat: "", year: "",
     open: null,            // 열려 있는 배너
     rows: 0,               // 입력표에 보이는 줄 수
-    slot: null,            // 편집 중인 칸 { account, key, data }
+    slot: null,            // 편집 중인 칸 { banner, account, key, data }
 };
 
 const sortBanners = () => g.banners.sort((a, b) => (b.start || "0").localeCompare(a.start || "0") || a.name.localeCompare(b.name, "ko"));
 const nikkeOf = (b) => g.metaByName.get(squash(b.name).replace(/무료1뽑$/, ""));
 
 const elementOf = (b) => b.element || nikkeOf(b)?.element || "";
+
+const md = (d) => d.slice(5).replace("-", "/");
+const BLANK_SLOT = () => ({ d: [], b: "blank", m: "" });
 
 function elementIcon(el) {
     return el ? `<img class="el" src="img/${ELEMENT_ICON[el]}.png" alt="${ELEMENT[el]}" title="${ELEMENT[el]}">` : "";
@@ -51,27 +55,46 @@ function filtered() {
         (!g.year || (b.start || "").startsWith(g.year)));
 }
 
+// 오늘 진행 중인 매일 무료 1뽑을 한 표에서: 줄 = 배너, 열 = 계정
+function todayDailyHtml() {
+    const today = gameDate();
+    const active = g.banners.filter((b) => isActiveDaily(b, today));
+    if (!active.length) return "";
+    const done = active.reduce((t, b) => t + ACCOUNTS.filter((a) => b.results?.[a]?.[today]).length, 0);
+    return `<section class="daily-today">
+        <h3 class="sec">오늘 무료 1뽑 <small class="muted">${md(today)} · 05시 기준 · ${done}/${active.length * ACCOUNTS.length}</small></h3>
+        <div class="table-wrap"><table class="pulls daily">
+            <thead><tr><th class="sticky">배너</th>${ACCOUNTS.map((a) => `<th>${esc(a)}</th>`).join("")}</tr></thead>
+            <tbody>${active.map((b) => `<tr><td class="sticky"><button class="linkish" data-open="${esc(b.id)}">${elementIcon(elementOf(b))}${esc(b.name)}</button>${b.end ? `<div class="muted">~${md(b.end)}</div>` : ""}</td>${ACCOUNTS.map((a) => {
+                const slot = b.results?.[a]?.[today];
+                return slot ? `<td class="slot ${slot.b ? "is-blank" : ""}" data-bid="${esc(b.id)}" data-acc="${esc(a)}" data-key="${today}">${slotHtml(slot)}</td>`
+                    : `<td class="daily-todo"><button class="btn small" data-quick="blank" data-bid="${esc(b.id)}" data-acc="${esc(a)}">꽝</button><button class="btn small drop-btn pickup" data-quick="ssr" data-bid="${esc(b.id)}" data-acc="${esc(a)}">SSR</button></td>`;
+            }).join("")}</tr>`).join("")}</tbody>
+        </table></div>
+    </section>`;
+}
+
 function renderList() {
     const list = filtered();
     $("#gacha-count").textContent = `${list.length}개 배너`;
     const firstUndated = list.findIndex((b) => !b.start);
-    $("#gacha-view").innerHTML = list.length ? `<div class="banner-list">${list.map((b, i) => {
+    $("#gacha-view").innerHTML = todayDailyHtml() + (list.length ? `<div class="banner-list">${list.map((b, i) => {
         const n = nikkeOf(b);
         const divider = i === firstUndated ? `<div class="banner-divider">날짜 없는 배너 — 배너를 열고 「정보 수정」에서 시작일을 넣으면 제자리로 정렬됩니다</div>` : "";
         return `${divider}<div class="banner-row" data-id="${esc(b.id)}">
             <div class="bthumb">${n ? `<img loading="lazy" src="${portraitUrl(n.resource)}" alt="">` : `<span class="newtag">NEW</span>`}</div>
             <div class="binfo">
                 <div class="bname">${elementIcon(elementOf(b))}<b>${esc(b.name)}</b></div>
-                <div class="muted">${esc(b.type || "출시 타입 없음")} · ${b.start || "날짜 없음"}${n || /무료\s*1뽑/.test(b.name) ? "" : " · 블라블라 업데이트 대기"}</div>
+                <div class="muted">${esc(b.type || "출시 타입 없음")} · ${b.start || "날짜 없음"}${b.daily && b.end ? `~${b.end}` : ""}${n || b.daily || /무료\s*1뽑/.test(b.name) ? "" : " · 블라블라 업데이트 대기"}</div>
             </div>
             <div class="bacc">${ACCOUNTS.map((a) => {
                 const slots = b.results?.[a];
                 if (!slots || !Object.keys(slots).length) return `<span class="bchip none" title="${esc(a)}">${esc(a)} -</span>`;
-                const s = accountSummary(slots);
-                return `<span class="bchip ${s.pickup ? "hit" : "miss"}" title="${esc(a)}: ${s.pulls}연 · 픽업 ${s.pickup}">${esc(a)} <b>${s.pulls}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
+                const s = accountSummary(slots, b.daily);
+                return `<span class="bchip ${s.pickup ? "hit" : "miss"}" title="${esc(a)}: ${s.pulls}${b.daily ? "회" : "연"} · 픽업 ${s.pickup}">${esc(a)} <b>${s.pulls}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
             }).join("")}</div>
         </div>`;
-    }).join("")}</div>` : `<p class="empty">배너가 없습니다. 「+ 새 배너」로 추가하거나 「기존 기록 가져오기」를 눌러 주세요.</p>`;
+    }).join("")}</div>` : `<p class="empty">배너가 없습니다. 「+ 새 배너」로 추가하거나 「기존 기록 가져오기」를 눌러 주세요.</p>`);
 }
 
 // ---------- 7계정 입력표 ----------
@@ -91,16 +114,23 @@ function renderBanner() {
     const b = g.open;
     const n = nikkeOf(b);
     const roster = JSON.parse(localStorage.getItem("hub_roster") || "{}");
-    const rows = [];
-    for (let k = 10; k <= g.rows; k += 10) rows.push(String(k));
-    const sums = Object.fromEntries(ACCOUNTS.map((a) => [a, accountSummary(b.results?.[a])]));
+    // 매일 무료 1뽑은 날짜 줄(최근 날짜가 위), 나머지는 10연차 줄
+    const dates = b.daily ? dailyDates(b, gameDate()) : [];
+    const rows = b.daily ? [...new Set([...dates, ...ACCOUNTS.flatMap((a) => Object.keys(b.results?.[a] || {}))])].sort().reverse() : [];
+    if (!b.daily) for (let k = 10; k <= g.rows; k += 10) rows.push(String(k));
+    const keyLabel = (k) => (b.daily ? `${md(k)}<div>${dates.indexOf(k) + 1 || ""}일째</div>` : k);
+    const sums = Object.fromEntries(ACCOUNTS.map((a) => [a, accountSummary(b.results?.[a], b.daily)]));
+    // 다시 그려도 보던 위치 유지 (칸 저장 후 맨 위로 튀지 않게)
+    const oldWrap = $("#banner-body .pulls-wrap");
+    const scroll = oldWrap ? [oldWrap.scrollTop, oldWrap.scrollLeft] : null;
+    const unit = b.daily ? "회" : "연";
 
     $("#banner-body").innerHTML = `
         <div class="dhead">
             ${n ? `<img src="${portraitUrl(n.resource)}" alt="">` : ""}
             <div class="grow">
                 <h2>${elementIcon(elementOf(b))} ${esc(b.name)}</h2>
-                <div class="muted">${esc(b.type || "출시 타입 없음")} · ${b.start || "날짜 없음"}${b.period ? ` · ${esc(b.period)}` : ""}</div>
+                <div class="muted">${esc(b.type || "출시 타입 없음")} · ${b.start || "날짜 없음"}${b.daily ? ` ~ ${b.end || "끝나는 날 없음"}` : ""}${b.period ? ` · ${esc(b.period)}` : ""}</div>
                 ${n ? "" : `<div class="muted">블라블라 니케 목록에 아직 없는 니케입니다. 업데이트 후 사진과 정보가 자동으로 붙습니다.</div>`}
                 ${n ? `<div class="tags"><b class="${rareClass(n.rare)}">${n.rare}</b>${nikkeIcons(n)}<span id="banner-extra"></span></div>` : ""}
                 ${n ? `<div class="owned">${ACCOUNTS.map((a) => {
@@ -112,31 +142,35 @@ function renderBanner() {
             <div class="row"><button class="btn" id="banner-edit">정보 수정</button></div>
         </div>
         <div class="table-wrap pulls-wrap"><table class="pulls">
-            <thead><tr><th class="sticky">연차</th>${ACCOUNTS.map((a) => `<th>${esc(a)}</th>`).join("")}</tr></thead>
-            <tbody>${rows.map((k) => `<tr><td class="sticky key">${k}</td>${ACCOUNTS.map((a) => {
+            <thead><tr><th class="sticky">${b.daily ? "날짜" : "연차"}</th>${ACCOUNTS.map((a) => `<th>${esc(a)}</th>`).join("")}</tr></thead>
+            <tbody>${rows.map((k) => `<tr><td class="sticky key">${keyLabel(k)}</td>${ACCOUNTS.map((a) => {
                 const slot = b.results?.[a]?.[k];
                 return `<td class="slot ${slot?.b ? "is-blank" : ""}" data-acc="${esc(a)}" data-key="${k}">${slotHtml(slot)}</td>`;
             }).join("")}</tr>`).join("")}</tbody>
             <tfoot><tr><td class="sticky">합계</td>${ACCOUNTS.map((a) => {
                 const s = sums[a];
-                return `<td>${s.pulls ? `<b>${s.pulls}연</b><div>픽업 ${s.pickup}${s.spook ? ` · 픽뚫 ${s.spook}` : ""}${s.pilgrim ? ` · 필그림 ${s.pilgrim}` : ""}${s.gold ? ` · 골티 ${s.gold}` : ""}</div>${s.firstPickup ? `<div class="muted">첫 픽업 ${s.firstPickup}연</div>` : ""}` : "-"}</td>`;
+                return `<td>${s.pulls ? `<b>${s.pulls}${unit}</b><div>픽업 ${s.pickup}${s.spook ? ` · 픽뚫 ${s.spook}` : ""}${s.pilgrim ? ` · 필그림 ${s.pilgrim}` : ""}${s.gold ? ` · 골티 ${s.gold}` : ""}</div>${s.firstPickup ? `<div class="muted">첫 픽업 ${s.firstPickup}${unit}</div>` : ""}` : "-"}</td>`;
             }).join("")}</tr></tfoot>
         </table></div>
-        <div class="row center"><button class="btn" id="more-rows">+ 50연차 더 보기</button></div>`;
+        ${b.daily ? (rows.length ? "" : `<p class="muted center">시작일이 되면 날짜 줄이 생깁니다. 「정보 수정」에서 시작일을 확인해 주세요.</p>`) : `<div class="row center"><button class="btn" id="more-rows">+ 50연차 더 보기</button></div>`}`;
+    if (scroll) { const w = $("#banner-body .pulls-wrap"); w.scrollTop = scroll[0]; w.scrollLeft = scroll[1]; }
     if (n) fillBannerExtra(n);
 }
 
 function openBanner(id) {
     g.open = g.banners.find((b) => b.id === id);
-    g.rows = Math.max(50, Math.ceil((maxSlot(g.open) + 20) / 10) * 10);
+    g.rows = g.open.daily ? 0 : Math.max(50, Math.ceil((maxSlot(g.open) + 20) / 10) * 10);
+    $("#banner-body").innerHTML = ""; // 다른 배너의 스크롤 위치를 이어받지 않게
     renderBanner();
     $("#banner-dialog").showModal();
 }
 
 // ---------- 칸 편집 ----------
 function renderSlotEditor() {
-    const { account, key, data } = g.slot;
-    $("#slot-title").textContent = `${account} · ${key}연차 (${Number(key) - 9}~${key})`;
+    const { banner, account, key, data } = g.slot;
+    $("#slot-title").textContent = banner.daily ? `${account} · ${md(key)} 무료 1뽑` : `${account} · ${key}연차 (${Number(key) - 9}~${key})`;
+    // 단차에는 골티·올블루·올퍼플이 없음
+    for (const el of document.querySelectorAll('#slot-add [data-add="gold"], #slot-blank input[value="blue"], #slot-blank input[value="purple"]')) (el.closest("label") || el).hidden = !!banner.daily;
     $("#slot-drops").innerHTML = data.d.map((d, i) => `<div class="drop-edit">
         <span class="drop ${DROP[d.t].cls}">${DROP[d.t].label}</span>
         <input data-i="${i}" data-f="n" value="${esc(d.n)}" placeholder="${d.t === "gold" ? "몇 장?" : "누구?"}" ${d.t === "gold" ? "" : 'list="gacha-nikke-names"'}>
@@ -147,28 +181,47 @@ function renderSlotEditor() {
     $("#slot-memo").value = data.m;
 }
 
-function openSlot(account, key) {
-    const cur = g.open.results?.[account]?.[key];
-    g.slot = { account, key, data: { d: (cur?.d || []).map((d) => ({ ...d })), b: cur?.b || "", m: cur?.m || "" } };
+function openSlot(banner, account, key) {
+    const cur = banner.results?.[account]?.[key];
+    g.slot = { banner, account, key, data: { d: (cur?.d || []).map((d) => ({ ...d })), b: cur?.b || "", m: cur?.m || "" } };
     renderSlotEditor();
     $("#slot-dialog").showModal();
 }
 
+async function storeSlot(banner, account, key, data) {
+    await saveSlot(banner.id, account, key, data);
+    banner.results ||= {};
+    banner.results[account] ||= {};
+    if (!data.d.length && !data.b && !data.m.trim()) delete banner.results[account][key];
+    else banner.results[account][key] = data;
+    if ($("#banner-dialog").open && g.open === banner) renderBanner();
+    if (g.view === "list") renderList();
+}
+
 async function saveSlotEdit() {
-    const { account, key, data } = g.slot;
+    const { banner, account, key, data } = g.slot;
     const btn = $("#slot-save");
     btn.disabled = true;
     try {
-        await saveSlot(g.open.id, account, key, data);
-        g.open.results ||= {};
-        g.open.results[account] ||= {};
-        if (!data.d.length && !data.b && !data.m.trim()) delete g.open.results[account][key];
-        else g.open.results[account][key] = data;
+        // 단차에서 아무것도 안 고르고 저장하면 꽝
+        await storeSlot(banner, account, key, banner.daily && !data.d.length && !data.b ? { ...BLANK_SLOT(), m: data.m } : data);
         $("#slot-dialog").close();
-        renderBanner();
-        renderList();
     } catch (e) { alert(`저장하지 못했습니다: ${e.message}`); }
     btn.disabled = false;
+}
+
+// 오늘 무료 1뽑 표의 「꽝」은 바로 저장, 「SSR」은 칸 편집 창을 픽업 한 줄이 들어간 채로 열기
+async function quickDaily(btn) {
+    const banner = g.banners.find((b) => b.id === btn.dataset.bid);
+    const account = btn.dataset.acc, today = gameDate();
+    if (btn.dataset.quick === "blank") {
+        btn.disabled = true;
+        try { await storeSlot(banner, account, today, BLANK_SLOT()); } catch (e) { alert(`저장하지 못했습니다: ${e.message}`); btn.disabled = false; }
+        return;
+    }
+    openSlot(banner, account, today);
+    g.slot.data.d.push({ t: "pickup", n: banner.name, x: false });
+    renderSlotEditor();
 }
 
 // ---------- 배너 정보 ----------
@@ -179,6 +232,9 @@ function openInfo(banner) {
     f.type.value = banner?.type || "";
     f.start.value = banner?.start || "";
     f.period.value = banner?.period || "";
+    f.daily.checked = !!banner?.daily;
+    f.end.value = banner?.end || "";
+    f.end.closest("label").hidden = !f.daily.checked;
     $("#info-delete").hidden = !banner;
     $("#info-title").textContent = banner ? "배너 정보 수정" : "새 배너";
     $("#info-dialog").showModal();
@@ -190,7 +246,9 @@ async function saveInfo(e) {
     const name = f.name.value.trim();
     if (!name) { f.name.focus(); return; }
     const n = g.metaByName.get(squash(name));
-    const info = { name, type: f.type.value.trim(), start: f.start.value || parseStart(f.period.value), period: f.period.value.trim(), element: n?.element || "" };
+    const daily = f.daily.checked;
+    const info = { name, type: f.type.value.trim() || (daily ? "매일 무료 1뽑" : ""), start: f.start.value || parseStart(f.period.value), period: f.period.value.trim(), element: n?.element || "",
+        daily, end: daily ? f.end.value || parseEnd(f.period.value) : "" };
     const id = f.dataset.id || newBannerId();
     const existing = g.banners.find((b) => b.id === id);
     if (existing && !n) info.element = existing.element; // 이름을 못 찾으면 원래 속성 유지
@@ -223,7 +281,7 @@ function statRow(label, banners, accounts) {
     for (const b of banners) for (const a of accounts) {
         const slots = b.results?.[a];
         if (!slots || !Object.keys(slots).length) continue;
-        const s = accountSummary(slots);
+        const s = accountSummary(slots, b.daily);
         t.banners++; t.pulls += s.pulls; t.pickup += s.pickup; t.spook += s.spook; t.pilgrim += s.pilgrim; t.gold += s.gold;
     }
     const ssr = t.pickup + t.spook + t.pilgrim;
@@ -301,11 +359,18 @@ export async function initGacha() {
     $("#g-year").addEventListener("change", (e) => { g.year = e.target.value; render(); });
     $("#gacha-new").addEventListener("click", () => openInfo(null));
     $("#gacha-import").addEventListener("click", runImport);
-    $("#gacha-view").addEventListener("click", (e) => { const id = e.target.closest(".banner-row")?.dataset.id; if (id) openBanner(id); });
+    $("#gacha-view").addEventListener("click", (e) => {
+        const quick = e.target.closest("[data-quick]");
+        if (quick) return quickDaily(quick);
+        const cell = e.target.closest("td.slot[data-bid]");
+        if (cell) return openSlot(g.banners.find((b) => b.id === cell.dataset.bid), cell.dataset.acc, cell.dataset.key);
+        const id = e.target.closest("[data-open]")?.dataset.open || e.target.closest(".banner-row")?.dataset.id;
+        if (id) openBanner(id);
+    });
 
     $("#banner-body").addEventListener("click", (e) => {
         const cell = e.target.closest("td.slot");
-        if (cell) return openSlot(cell.dataset.acc, cell.dataset.key);
+        if (cell) return openSlot(g.open, cell.dataset.acc, cell.dataset.key);
         if (e.target.id === "more-rows") { g.rows += 50; renderBanner(); }
         if (e.target.id === "banner-edit") openInfo(g.open);
     });
@@ -333,6 +398,12 @@ export async function initGacha() {
     $("#slot-clear").addEventListener("click", () => { g.slot.data = { d: [], b: "", m: "" }; renderSlotEditor(); });
 
     $("#info-form").addEventListener("submit", saveInfo);
+    $("#info-form").daily.addEventListener("change", (e) => {
+        const f = e.target.form;
+        f.end.closest("label").hidden = !e.target.checked;
+        if (e.target.checked) { f.type.value ||= "매일 무료 1뽑"; f.end.value ||= parseEnd(f.period.value); }
+    });
+    $("#info-form").period.addEventListener("change", (e) => { const f = e.target.form; if (f.daily.checked && !f.end.value) f.end.value = parseEnd(f.period.value); });
     $("#info-delete").addEventListener("click", removeBanner);
 
     render();

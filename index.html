@@ -174,6 +174,8 @@
             <label>출시 타입<input name="type" list="gacha-types" placeholder="목록에서 고르거나 직접 입력" autocomplete="off"></label>
             <label>시작일<input name="start" type="date"></label>
             <label>모집 기간 (원문, 선택)<input name="period" placeholder="모집 기간 : 2026년 7월 30일(목) ~ ..."></label>
+            <label class="check"><input name="daily" type="checkbox">매일 무료 1뽑 (하루 1회 단차, 날짜별로 기록)</label>
+            <label hidden>마지막 날 (05시 기준, 비우면 모집 기간에서 자동)<input name="end" type="date"></label>
             <div class="row end">
                 <button type="button" class="btn danger" id="info-delete" hidden>배너 삭제</button>
                 <button type="submit" class="btn primary">저장</button>

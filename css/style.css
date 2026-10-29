@@ -451,3 +451,14 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .fr0 { background: var(--star-soft); color: var(--star); }
 .stats.center th, .stats.center td { text-align: center; }
 .stats.center .sticky { text-align: left; }
+
+/* 매일 무료 1뽑 */
+.form label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--text, inherit); }
+.daily-today { margin-bottom: 16px; }
+.pulls.daily td.sticky { min-width: 140px; }
+.pulls td.daily-todo { white-space: nowrap; }
+.pulls td.daily-todo .btn + .btn { margin-left: 4px; }
+.linkish { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.linkish:hover { color: var(--primary); }
+.pulls td.key div { font-size: 0.7rem; }
+p.center { text-align: center; }
