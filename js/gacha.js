@@ -179,6 +179,7 @@ function renderSlotEditor() {
     </div>`).join("") || `<p class="muted">아래 버튼으로 뽑은 SSR을 추가하세요.</p>`;
     document.querySelectorAll("#slot-blank input").forEach((r) => (r.checked = r.value === data.b));
     $("#slot-memo").value = data.m;
+    $("#slot-clear").hidden = !banner.results?.[account]?.[key]; // 저장된 기록이 있을 때만
 }
 
 function openSlot(banner, account, key) {
@@ -207,6 +208,19 @@ async function saveSlotEdit() {
         await storeSlot(banner, account, key, banner.daily && !data.d.length && !data.b ? { ...BLANK_SLOT(), m: data.m } : data);
         $("#slot-dialog").close();
     } catch (e) { alert(`저장하지 못했습니다: ${e.message}`); }
+    btn.disabled = false;
+}
+
+// 잘못 넣은 칸은 바로 지움 (저장을 다시 누르지 않아도 됨)
+async function clearSlot() {
+    const { banner, account, key } = g.slot;
+    if (!confirm(`${account} · ${banner.daily ? md(key) : `${key}연차`} 기록을 지울까요?`)) return;
+    const btn = $("#slot-clear");
+    btn.disabled = true;
+    try {
+        await storeSlot(banner, account, key, { d: [], b: "", m: "" });
+        $("#slot-dialog").close();
+    } catch (e) { alert(`지우지 못했습니다: ${e.message}`); }
     btn.disabled = false;
 }
 
@@ -395,7 +409,7 @@ export async function initGacha() {
     $("#slot-blank").addEventListener("change", (e) => { g.slot.data.b = e.target.value; });
     $("#slot-memo").addEventListener("input", (e) => { g.slot.data.m = e.target.value; });
     $("#slot-save").addEventListener("click", saveSlotEdit);
-    $("#slot-clear").addEventListener("click", () => { g.slot.data = { d: [], b: "", m: "" }; renderSlotEditor(); });
+    $("#slot-clear").addEventListener("click", clearSlot);
 
     $("#info-form").addEventListener("submit", saveInfo);
     $("#info-form").daily.addEventListener("change", (e) => {
