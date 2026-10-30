@@ -3,6 +3,7 @@ import { loadNikkeList, portraitUrl, loadRoleData, nikkeIcons, rareClass, ELEMEN
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "./store.js";
 import { gameDate } from "./intercept-data.js";
+import { buildRecolorPlan, KIND_LABEL, dropLabel } from "./gacha-recolor.js";
 
 // 배너 상단에 스쿼드·이벤트 스토리(도감 상세에서 입력한 것)를 나중에 채움
 async function fillBannerExtra(n) {
@@ -17,7 +18,7 @@ async function fillBannerExtra(n) {
 import {
     DROP, BLANK, BANNER_TYPES, typeCategory, parseStart, parseEnd, dailyDates, isActiveDaily, accountSummary,
     loadBanners, saveBannerInfo, saveSlot, deleteBanner, newBannerId,
-    buildLegacyBanners, importLegacy, loadReleaseDates,
+    buildLegacyBanners, importLegacy, loadReleaseDates, saveSlots,
 } from "./gacha-data.js";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -350,6 +351,69 @@ async function runImport() {
     btn.textContent = "기존 기록 가져오기";
 }
 
+// ---------- 엑셀 색으로 다시 분류 ----------
+const dropChips = (ds) => ds.map((d) => `<span class="drop ${DROP[d.t]?.cls || ""}${d.x ? " dust" : ""}">${esc(d.n || DROP[d.t]?.label || d.t)}</span>`).join("") || `<span class="muted">-</span>`;
+const tokenChips = (ts) => ts.map((t) => `<span class="xtok k-${t.kind}">${esc(t.text)}</span>`).join(" ");
+
+function recolorRows(rows, withMsg) {
+    const groups = new Map();
+    for (const r of rows) groups.set(r.banner, [...(groups.get(r.banner) || []), r]);
+    return [...groups].map(([b, list]) => `<details><summary><b>${esc(b.name)}</b> <span class="muted">${esc(b.type || "")} · ${b.start || "날짜 없음"} · ${list.length}칸</span></summary>
+        <div class="table-wrap"><table class="stats recolor"><thead><tr><th>계정</th><th>연차</th><th>지금 허브</th><th>바뀐 뒤</th><th>엑셀 원문</th>${withMsg ? "<th>확인할 점</th>" : ""}</tr></thead><tbody>
+        ${list.sort((x, y) => ACCOUNTS.indexOf(x.account) - ACCOUNTS.indexOf(y.account) || x.key - y.key).map((r) => `<tr><td>${esc(r.account)}</td><td>${r.key}</td><td>${dropChips(r.before)}</td><td>${dropChips(r.after)}</td><td>${tokenChips(r.tokens)}</td>${withMsg ? `<td class="muted">${esc(r.msg)}</td>` : ""}</tr>`).join("")}
+        </tbody></table></div></details>`).join("");
+}
+
+function renderRecolor(plan) {
+    const moves = new Map();
+    let people = 0;
+    for (const c of plan.changes) c.before.forEach((d, i) => {
+        const a = c.after[i];
+        if (dropLabel(d) === dropLabel(a)) return;
+        people++;
+        const k = `${KIND_LABEL[dropLabel(d)] || d.t} → ${KIND_LABEL[dropLabel(a)] || a.t}`;
+        moves.set(k, (moves.get(k) || 0) + 1);
+    });
+    const missing = [...plan.missingBanners];
+    $("#recolor-body").innerHTML = `<h2>엑셀 색으로 다시 분류 — 미리보기</h2>
+        <p class="muted">주황 = 픽업 · 검정 = 픽뚫 · 초록 = 픽뚫(가루) · 하늘·파랑 = 필그림(오버스펙 포함). 칸 구분만 바꾸고, 니케 이름이 비어 있던 칸에는 엑셀 이름을 채웁니다. 아직 저장하지 않았습니다.</p>
+        <ul class="recolor-sum">
+            <li><b>바뀌는 칸 ${plan.changes.length}개</b> (구분이 바뀌는 니케 ${people}명)${moves.size ? `: ${[...moves].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} <b>${n}</b>`).join(" · ")}` : ""}</li>
+            <li>확인이 필요한 칸 ${plan.problems.length}개 — 이 칸들은 이름이 맞은 니케만 바꾸고 나머지는 그대로 둡니다</li>
+            <li>허브에서 못 찾은 배너 ${missing.length}개${missing.length ? `: <span class="muted">${missing.map(([n, accs]) => `${esc(n)}(${accs.map(esc).join("·")})`).join(", ")}</span>` : ""}</li>
+            <li>허브에 기록이 없는 칸 ${plan.missingSlots.length}개 <span class="muted">(엑셀에만 있어 건드리지 않음)</span></li>
+            <li>계정별 색 구분 시작: <span class="muted">${plan.eras.map((e) => `${esc(e.account)} 「${esc(e.oldest)}」부터 ${e.count}개`).join(" · ")}</span></li>
+            ${plan.skippedSheets.length ? `<li class="muted">건너뛴 시트: ${plan.skippedSheets.map(esc).join(", ")}</li>` : ""}
+        </ul>
+        <h3 class="sec">바뀌는 칸</h3>${recolorRows(plan.changes, false) || `<p class="muted">없음</p>`}
+        ${plan.problems.length ? `<h3 class="sec">확인이 필요한 칸</h3>${recolorRows(plan.problems, true)}` : ""}
+        ${plan.missingSlots.length ? `<h3 class="sec">허브에 기록이 없는 칸</h3><div class="table-wrap"><table class="stats recolor"><thead><tr><th>배너</th><th>계정</th><th>연차</th><th>엑셀 원문</th></tr></thead><tbody>
+            ${plan.missingSlots.map((r) => `<tr><td>${esc(r.banner.name)}</td><td>${esc(r.account)}</td><td>${r.key}</td><td>${tokenChips(r.tokens)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+        <div class="row end"><span class="muted" id="recolor-status">적용 전에 홈의 「백업 다운로드」를 한 번 받아 두면 안전합니다.</span>
+            <button class="btn" data-close>취소</button><button class="btn primary" id="recolor-apply" ${plan.changes.length ? "" : "disabled"}>${plan.changes.length}칸 적용</button></div>`;
+    $("#recolor-body [data-close]").addEventListener("click", () => $("#recolor-dialog").close());
+    $("#recolor-apply").addEventListener("click", async (e) => {
+        if (!confirm(`${plan.changes.length}칸의 구분을 엑셀 색대로 바꿀까요?`)) return;
+        const btn = e.currentTarget, status = $("#recolor-status");
+        btn.disabled = true;
+        try {
+            const rows = plan.changes.map((c) => ({ id: c.banner.id, account: c.account, key: c.key, slot: { ...c.slot, d: c.after } }));
+            await saveSlots(rows, (n) => (status.textContent = `저장 중… ${n}/${rows.length}`));
+            for (const r of rows) g.banners.find((b) => b.id === r.id).results[r.account][r.key] = r.slot;
+            status.textContent = `${rows.length}칸 저장 완료`;
+            btn.textContent = "완료";
+            render();
+        } catch (err) { status.textContent = `저장하지 못했습니다: ${err.message}`; btn.disabled = false; }
+    });
+}
+
+async function runRecolor(file) {
+    $("#recolor-body").innerHTML = `<p class="empty">엑셀을 읽는 중…</p>`;
+    $("#recolor-dialog").showModal();
+    try { renderRecolor(await buildRecolorPlan(file, g.banners, g.meta)); }
+    catch (e) { $("#recolor-body").innerHTML = `<p class="empty">엑셀을 읽지 못했습니다: ${esc(e.message)}</p>`; }
+}
+
 // ---------- 시작 ----------
 let started = false;
 export async function initGacha() {
@@ -373,6 +437,7 @@ export async function initGacha() {
     $("#g-year").addEventListener("change", (e) => { g.year = e.target.value; render(); });
     $("#gacha-new").addEventListener("click", () => openInfo(null));
     $("#gacha-import").addEventListener("click", runImport);
+    $("#gacha-recolor").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) runRecolor(f); });
     $("#gacha-view").addEventListener("click", (e) => {
         const quick = e.target.closest("[data-quick]");
         if (quick) return quickDaily(quick);

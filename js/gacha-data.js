@@ -91,6 +91,17 @@ export async function saveSlot(id, account, key, slot) {
     await updateDoc(doc(db, "gacha_banners", id), new FieldPath("results", account, key), empty ? deleteField() : slot, "edited", true);
 }
 
+// 여러 칸을 한 번에 저장 (엑셀 색 다시 분류용). rows: [{ id, account, key, slot }]
+export async function saveSlots(rows, onProgress) {
+    bannersCache = null;
+    for (let i = 0; i < rows.length; i += 400) {
+        const batch = writeBatch(db);
+        for (const r of rows.slice(i, i + 400)) batch.update(doc(db, "gacha_banners", r.id), new FieldPath("results", r.account, r.key), r.slot, "edited", true);
+        await batch.commit();
+        onProgress?.(Math.min(i + 400, rows.length));
+    }
+}
+
 export const deleteBanner = (id) => { bannersCache = null; return deleteDoc(doc(db, "gacha_banners", id)); };
 
 export function newBannerId() {

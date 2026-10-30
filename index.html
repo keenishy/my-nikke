@@ -71,6 +71,7 @@
                 <span class="spacer"></span>
                 <button class="btn primary" id="gacha-new">+ 새 배너</button>
                 <button class="btn" id="gacha-import">기존 기록 가져오기</button>
+                <label class="btn" title="예전 수기 엑셀의 글자 색으로 픽업·픽뚫·가루·필그림을 다시 나눕니다">엑셀 색으로 다시 분류<input type="file" id="gacha-recolor" accept=".xlsx" hidden></label>
             </div>
             <div class="filters">
                 <input id="g-q" type="search" placeholder="배너(니케) 이름 검색">
@@ -164,6 +165,11 @@
             <button class="btn danger" id="slot-clear" title="이 칸의 기록을 지웁니다">칸 지우기</button>
             <button class="btn primary" id="slot-save">저장</button>
         </div>
+    </dialog>
+
+    <dialog id="recolor-dialog" class="wide">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <div id="recolor-body"></div>
     </dialog>
 
     <dialog id="info-dialog">

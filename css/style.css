@@ -462,3 +462,11 @@ img.ico, .nk img.ico, .dhead img.ico, .tags img.ico { width: auto; height: 16px;
 .linkish:hover { color: var(--primary); }
 .pulls td.key div { font-size: 0.7rem; }
 p.center { text-align: center; }
+
+/* 엑셀 색으로 다시 분류 */
+.recolor-sum { margin: 8px 0 12px; padding-left: 18px; line-height: 1.7; font-size: 0.9rem; }
+#recolor-body details { border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; }
+#recolor-body summary { cursor: pointer; }
+.stats.recolor th, .stats.recolor td { text-align: left; white-space: normal; }
+.xtok { display: inline-block; padding: 0 4px; border-radius: 4px; background: var(--bg); font-size: 0.8rem; }
+.xtok.k-pickup { color: #ED7D31; } .xtok.k-dust { color: #3fbf5f; } .xtok.k-pilgrim { color: #5B9BD5; } .xtok.k-unknown { color: var(--danger); text-decoration: underline wavy; }
