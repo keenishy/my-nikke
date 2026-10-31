@@ -116,8 +116,8 @@ function joinKey(id, apiIndex) {
 }
 
 function raidHtml(r) {
-    try { checkOwnGuild(r, r.guild); }
-    catch { return `<p class="warn">저장된 이 시즌 기록은 다른 유니온 것입니다 (${esc([...new Set(r.attacks.map((a) => a.nick))].join(", "))}). Worker를 최신 코드로 배포한 뒤 「다시 불러오기」를 눌러 주세요.</p>`; }
+    if (!isOwnGuild(r, r.guild)) return `<p class="warn">저장된 이 시즌 기록(${new Date(r.fetched_at).toLocaleString("ko-KR")} 받음)은 다른 유니온 것으로 보입니다: 공격한 사람 ${esc([...new Set(r.attacks.map((a) => a.nick))].join(", "))}.<br>
+        ${esc(guildHint(r.guild))}. 「다시 불러오기」를 눌러도 이 문구가 남으면 버튼 옆에 나오는 메시지를 확인해 주세요.</p>`;
     // 내 계정 강조: 이 유니온 소속 계정 이름과 게임 닉네임이 같으면 내 계정으로 봄
     const accs = accountsOf(r.guild);
     const accOf = (nick) => accs.find((a) => a === nick) || "";
@@ -245,12 +245,17 @@ async function refreshInfo() {
 }
 
 // 받은 공격 기록이 이 유니온 멤버 것인지 확인 (다른 유니온 기록이 섞여 저장되는 것 방지)
-function checkOwnGuild(r, g) {
+// 멤버 번호·닉네임, 허브가 아는 계정별 소속 유니온 중 하나라도 맞으면 이 유니온 기록으로 봄
+function isOwnGuild(r, g) {
     const roster = u.members[g]?.list || [];
-    if (!roster.length || !r.attacks.length) return;
-    const ids = new Set(roster.map((m) => m.id));
-    if (!r.attacks.some((a) => ids.has(a.openid)))
-        throw new Error(`이 유니온 멤버가 아닌 사람의 기록만 왔습니다 (${[...new Set(r.attacks.map((a) => a.nick))].join(", ")}). Worker를 최신 코드로 다시 배포하거나, 이 유니온 소속 계정 쿠키를 넣어 주세요.`);
+    if (!roster.length || !r.attacks.length) return true;
+    const ids = new Set(roster.map((m) => m.id)), nicks = new Set(roster.map((m) => m.nick)), mine = accountsOf(g);
+    return r.attacks.some((a) => ids.has(a.openid) || nicks.has(a.nick) || mine.includes(a.nick));
+}
+const guildHint = (g) => `이 유니온의 허브 계정: ${accountsOf(g).join(", ") || "없음"} · 멤버 목록 ${u.members[g]?.list.length ?? 0}명`;
+function checkOwnGuild(r, g) {
+    if (!isOwnGuild(r, g))
+        throw new Error(`이 유니온 멤버가 아닌 사람의 기록만 왔습니다 (${[...new Set(r.attacks.map((a) => a.nick))].join(", ")}). ${guildHint(g)}`);
 }
 
 // 받는 도중에 다른 유니온 탭을 눌러도 처음 고른 유니온에 저장되도록 유니온·시즌을 먼저 고정
