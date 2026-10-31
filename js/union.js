@@ -108,7 +108,7 @@ function joinKey(id, apiIndex) {
     let first = Infinity;
     for (const s of u.seasons) {
         const r = u.raids[`${u.current}_${s.id}`];
-        if (r?.attacks.some((a) => a.openid === id)) first = Math.min(first, s.start_ts * 1000);
+        if (r && isOwnGuild(r, u.current) && r.attacks.some((a) => a.openid === id)) first = Math.min(first, s.start_ts * 1000);
     }
     const seen = u.members[u.current]?.firstSeen?.[id];
     if (seen) first = Math.min(first, new Date(seen).getTime());
@@ -185,7 +185,8 @@ function raidHtml(r) {
 // 가입일을 알 수 없으므로, 처음 공격한 시즌(또는 허브가 처음 본 날) 이전 시즌은 "가입 전"으로 보고 계산에서 뺌
 function historyHtml() {
     const g = u.current;
-    const saved = Object.values(u.raids).filter((r) => r.guild === g).sort((a, b) => Number(b.season) - Number(a.season));
+    // 다른 유니온 기록이 잘못 저장된 시즌은 참여율 계산에서 뺌
+    const saved = Object.values(u.raids).filter((r) => r.guild === g && isOwnGuild(r, g)).sort((a, b) => Number(b.season) - Number(a.season));
     if (saved.length < 2) return "";
     const info = new Map(u.seasons.map((s) => [String(s.id), s]));
     const label = (r) => info.get(String(r.season))?.season_start_date.slice(5, 10).replace("-", "/") || String(r.season).slice(-2);
