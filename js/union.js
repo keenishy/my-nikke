@@ -254,9 +254,12 @@ function isOwnGuild(r, g) {
     return r.attacks.some((a) => ids.has(a.openid) || nicks.has(a.nick) || mine.includes(a.nick));
 }
 const guildHint = (g) => `이 유니온의 허브 계정: ${accountsOf(g).join(", ") || "없음"} · 멤버 목록 ${u.members[g]?.list.length ?? 0}명`;
-function checkOwnGuild(r, g) {
-    if (!isOwnGuild(r, g))
-        throw new Error(`이 유니온 멤버가 아닌 사람의 기록만 왔습니다 (${[...new Set(r.attacks.map((a) => a.nick))].join(", ")}). ${guildHint(g)}`);
+// raw: Worker 원본 응답 (어떤 쿠키로 받았는지 via·via_guild가 들어 있음, 예전 Worker는 없음)
+function checkOwnGuild(r, g, raw) {
+    if (isOwnGuild(r, g)) return;
+    const via = !raw ? "" : raw.version ? ` · Worker ${raw.version}, 사용한 쿠키 ${raw.via || "?"}${raw.via_guild ? ` (소속 유니온 ${raw.via_guild})` : ""}`
+        : " · Worker가 아직 예전 코드입니다. Cloudflare에서 최신 worker/blabla-proxy.js로 다시 배포해 주세요";
+    throw new Error(`이 유니온 멤버가 아닌 사람의 기록만 왔습니다 (${[...new Set(r.attacks.map((a) => a.nick))].join(", ")}). ${guildHint(g)}${via}`);
 }
 
 // 받는 도중에 다른 유니온 탭을 눌러도 처음 고른 유니온에 저장되도록 유니온·시즌을 먼저 고정
@@ -266,9 +269,10 @@ async function loadSeason() {
     if (!s) return;
     $("#un-raid-status").textContent = "받는 중…";
     try {
-        const r = normalizeRaid(await fetchUnionRaid(g, season, isLive(s)));
+        const raw = await fetchUnionRaid(g, season, isLive(s));
+        const r = normalizeRaid(raw);
         await refreshMembers(true, g);
-        checkOwnGuild(r, g);
+        checkOwnGuild(r, g, raw);
         const key = `${g}_${season}`;
         await setDoc(doc(db, "union_raids", key), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
         u.raids[key] = r;
@@ -285,8 +289,9 @@ async function loadAllSeasons() {
     for (const [i, s] of todo.entries()) {
         $("#un-raid-status").textContent = `받는 중 ${i + 1}/${todo.length} (${seasonLabel(s)})`;
         try {
-            const r = normalizeRaid(await fetchUnionRaid(g, String(s.id), isLive(s)));
-            checkOwnGuild(r, g);
+            const raw = await fetchUnionRaid(g, String(s.id), isLive(s));
+            const r = normalizeRaid(raw);
+            checkOwnGuild(r, g, raw);
             await setDoc(doc(db, "union_raids", `${g}_${s.id}`), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
             u.raids[`${g}_${s.id}`] = r;
         } catch (e) { $("#un-raid-status").textContent = `실패: ${e.message}`; return; }

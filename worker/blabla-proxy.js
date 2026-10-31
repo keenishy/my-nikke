@@ -17,6 +17,7 @@
 
 const API = "https://api.blablalink.com/api/";
 const AREA = 83; // 한국 서버
+const VERSION = "2026-10-31b"; // 허브에서 배포된 코드가 최신인지 확인용
 const COMMON = { game_id: "29080", area_id: "global", source: "pc_web", intl_game_id: "29080", language: "ko", env: "prod" };
 
 const cors = {
@@ -79,7 +80,7 @@ export default {
         if (k === "BLA_COOKIE" || typeof v !== "string" || !v.includes("game_token=")) continue;
         extra[k] = codeOf(await calm(env, "game/proxy/Game/GetSavedRoleInfo", {}, v)) === 0 ? "ok" : "만료 또는 잘못됨";
       }
-      return reply({ accounts: Object.keys(accounts), cookie: codeOf(me) === 0 ? "ok" : "만료 또는 잘못됨", union_cookies: extra });
+      return reply({ version: VERSION, accounts: Object.keys(accounts), cookie: codeOf(me) === 0 ? "ok" : "만료 또는 잘못됨", union_cookies: extra });
     }
 
     if (url.pathname === "/sync") {
@@ -146,21 +147,23 @@ export default {
     // ownerOnly: 진행 중 시즌 API는 guild_id와 상관없이 쿠키 주인의 유니온 기록을 돌려주므로, 그 유니온 소속 쿠키만 씀
     async function withGuildCookie(guild, fn, ownerOnly = false) {
       let expiredName = "";
+      const tried = [];
       for (const [name, cookie] of cookieCandidates(guild)) {
+        let owner = "";
         if (ownerOnly) {
-          let owner = "";
           try { owner = await ownerGuild(cookie); } catch {}
+          tried.push(`${name}→${owner || "?"}`);
           if (owner !== guild) continue;
         }
         const result = await fn(cookie);
         const code = codeOf(result[0]);
         if (code === 1303028) continue;
         if (code === 300001) { expiredName ||= name; continue; }
-        return { result, name };
+        return { result, name, owner };
       }
       return { error: expiredName
         ? reply({ error: `블라블라 로그인 쿠키(${expiredName})가 만료됐습니다. 그 계정 쿠키를 다시 넣어 주세요.` }, 401)
-        : reply({ error: "이 유니온 소속 계정의 블라블라 쿠키가 없습니다. 그 유니온 계정으로 로그인한 쿠키를 Cloudflare 비밀값에 추가해 주세요." }, 403) };
+        : reply({ error: `이 유니온 소속 계정의 블라블라 쿠키가 없습니다. 그 유니온 계정으로 로그인한 쿠키를 Cloudflare 비밀값에 추가해 주세요.${tried.length ? ` (확인한 쿠키→소속 유니온: ${tried.join(", ")})` : ""}` }, 403) };
     }
 
     if (url.pathname === "/union-raid") {
@@ -183,7 +186,7 @@ export default {
       if (got.error) return got.error;
       const [raid, level] = got.result;
       if (codeOf(raid) !== 0) return reply({ error: "유니온 레이드 기록을 받지 못했습니다", detail: raid.slice(0, 300) }, 502);
-      return reply(`{"guild":${JSON.stringify(guild)},"season":${JSON.stringify(season)},"fetched_at":${JSON.stringify(new Date().toISOString())},"raid":${raid},"level":${level}}`);
+      return reply(`{"version":${JSON.stringify(VERSION)},"via":${JSON.stringify(got.name)},"via_guild":${JSON.stringify(got.owner)},"guild":${JSON.stringify(guild)},"season":${JSON.stringify(season)},"fetched_at":${JSON.stringify(new Date().toISOString())},"raid":${raid},"level":${level}}`);
     }
 
     if (url.pathname === "/union-members") {
