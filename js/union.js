@@ -116,6 +116,8 @@ function joinKey(id, apiIndex) {
 }
 
 function raidHtml(r) {
+    try { checkOwnGuild(r, r.guild); }
+    catch { return `<p class="warn">저장된 이 시즌 기록은 다른 유니온 것입니다 (${esc([...new Set(r.attacks.map((a) => a.nick))].join(", "))}). Worker를 최신 코드로 배포한 뒤 「다시 불러오기」를 눌러 주세요.</p>`; }
     // 내 계정 강조: 이 유니온 소속 계정 이름과 게임 닉네임이 같으면 내 계정으로 봄
     const accs = accountsOf(r.guild);
     const accOf = (nick) => accs.find((a) => a === nick) || "";
@@ -242,6 +244,15 @@ async function refreshInfo() {
     } catch (e) { $("#un-status").textContent = `실패: ${e.message}`; }
 }
 
+// 받은 공격 기록이 이 유니온 멤버 것인지 확인 (다른 유니온 기록이 섞여 저장되는 것 방지)
+function checkOwnGuild(r, g) {
+    const roster = u.members[g]?.list || [];
+    if (!roster.length || !r.attacks.length) return;
+    const ids = new Set(roster.map((m) => m.id));
+    if (!r.attacks.some((a) => ids.has(a.openid)))
+        throw new Error(`이 유니온 멤버가 아닌 사람의 기록만 왔습니다 (${[...new Set(r.attacks.map((a) => a.nick))].join(", ")}). Worker를 최신 코드로 다시 배포하거나, 이 유니온 소속 계정 쿠키를 넣어 주세요.`);
+}
+
 // 받는 도중에 다른 유니온 탭을 눌러도 처음 고른 유니온에 저장되도록 유니온·시즌을 먼저 고정
 async function loadSeason() {
     const g = u.current, season = u.season;
@@ -250,10 +261,11 @@ async function loadSeason() {
     $("#un-raid-status").textContent = "받는 중…";
     try {
         const r = normalizeRaid(await fetchUnionRaid(g, season, isLive(s)));
+        await refreshMembers(true, g);
+        checkOwnGuild(r, g);
         const key = `${g}_${season}`;
         await setDoc(doc(db, "union_raids", key), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
         u.raids[key] = r;
-        await refreshMembers(true, g);
         render();
     } catch (e) { $("#un-raid-status").textContent = `실패: ${e.message}`; }
 }
@@ -268,6 +280,7 @@ async function loadAllSeasons() {
         $("#un-raid-status").textContent = `받는 중 ${i + 1}/${todo.length} (${seasonLabel(s)})`;
         try {
             const r = normalizeRaid(await fetchUnionRaid(g, String(s.id), isLive(s)));
+            checkOwnGuild(r, g);
             await setDoc(doc(db, "union_raids", `${g}_${s.id}`), { guild: r.guild, season: r.season, fetched_at: r.fetched_at, data: JSON.stringify(r) });
             u.raids[`${g}_${s.id}`] = r;
         } catch (e) { $("#un-raid-status").textContent = `실패: ${e.message}`; return; }

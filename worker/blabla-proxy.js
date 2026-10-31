@@ -135,10 +135,23 @@ export default {
       const base = all.filter(([k]) => k === "BLA_COOKIE");
       return [...named, ...rest, ...base];
     };
+    // 쿠키 주인(game_openid)의 소속 유니온 id
+    const ownerGuild = async (cookie) => {
+      const me = (cookie.match(/game_openid=(\d+)/) || [])[1];
+      if (!me) return "";
+      const text = await calm(env, "game/proxy/Game/GetUserProfileBasicInfo", { intl_open_id: me, nikke_area_id: AREA }, cookie);
+      return String(JSON.parse(text).data?.basic_info?.gsn || "");
+    };
     // fn(cookie) 결과가 "유니온 소속 아님"이 아닐 때까지 쿠키를 바꿔 가며 시도
-    async function withGuildCookie(guild, fn) {
+    // ownerOnly: 진행 중 시즌 API는 guild_id와 상관없이 쿠키 주인의 유니온 기록을 돌려주므로, 그 유니온 소속 쿠키만 씀
+    async function withGuildCookie(guild, fn, ownerOnly = false) {
       let expiredName = "";
       for (const [name, cookie] of cookieCandidates(guild)) {
+        if (ownerOnly) {
+          let owner = "";
+          try { owner = await ownerGuild(cookie); } catch {}
+          if (owner !== guild) continue;
+        }
         const result = await fn(cookie);
         const code = codeOf(result[0]);
         if (code === 1303028) continue;
@@ -166,7 +179,7 @@ export default {
           ? await calm(env, "game/proxy/Game/GetUnionRaidLevelInfo", { guild_id: guild, nikke_area_id: AREA, intl_open_id: me }, cookie)
           : await calm(env, "game/proxy/Game/GetUnionRaidLevelDataOfGuildSeason", { area_id: AREA, guild_id: guild, season_id: season }, cookie);
         return [first, second];
-      });
+      }, live);
       if (got.error) return got.error;
       const [raid, level] = got.result;
       if (codeOf(raid) !== 0) return reply({ error: "유니온 레이드 기록을 받지 못했습니다", detail: raid.slice(0, 300) }, 502);
