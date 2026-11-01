@@ -22,8 +22,6 @@ const t = {
 const sortedDays = () => t.days.slice().sort((a, b) => b.date.localeCompare(a.date));
 const inPeriod = (d) => !t.month || d.date.startsWith(t.month);
 const dayLabel = (date) => `${date.slice(2).replace(/-/g, ".")} (${WEEK[new Date(`${date}T00:00:00`).getDay()]})`;
-// 목록 칸의 장비는 기업 색 점 하나로 (자세한 건 마우스를 올리면)
-const gearDot = (c, r) => (c ? `<i class="gdot ${CORP_CLS[c] || ""}"></i>` : "");
 const gearName = (c, r) => (c ? `${c}${r ? ` ${r}` : ""}` : "");
 const gearBadge = (c, r) => (c ? `<span class="gear ${CORP_CLS[c] || ""}" title="${esc(c)} ${esc(r)}">${esc(c[0])}${esc(r?.[0] || "")}</span>` : "");
 
@@ -64,7 +62,7 @@ function renderList() {
                     if (!x) return `<td class="dim">-</td>`;
                     const memo = x.memo ? `<span class="ic-memo" title="${esc(x.memo)}">✎</span>` : "";
                     if (x.skip) return `<td class="dim" title="${esc(x.memo || "")}">미참여 ${memo}</td>`;
-                    // 칸 하나 = 총 개수(크게) + 장비 점 + 회차별 숫자(작게). 자세한 내용은 마우스를 올리면 보임
+                    // 칸 하나 = 위: 총 개수(크게) + 회차별 숫자(흐리고 작게) / 아래: 획득 장비. 자세한 내용은 마우스를 올리면 보임
                     const mods = x.runs.map((r) => (r.skip ? "×" : r.mod)).join("·");
                     const fmods = x.fb ? x.runs.map((r) => (r.skip ? "×" : r.fmod)).join("·") : "";
                     const gearList = x.runs.flatMap((r) => (r.skip ? [] : [[r.c, r.r], ...(x.fb ? [[r.fc, r.fr]] : [])])).filter(([c]) => c);
@@ -72,8 +70,8 @@ function renderList() {
                     const total = actualOf(x), good = total >= expectedOf(x, d.date);
                     const tip = [`일반 ${mods}`, fmods && `풀버 +${fmods}`, gearList.length && `장비 ${gearList.map(([c, r]) => gearName(c, r)).join(", ")}`, x.memo && `메모 ${x.memo}`].filter(Boolean).join("\n");
                     return `<td class="ic-cell" title="${esc(tip)}">
-                        <div class="ic-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-dots">${gearList.map(([c, r]) => gearDot(c, r)).join("")}</span>${memo}</div>
-                        <div class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</div></td>`;
+                        <div class="ic-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</span>${memo}</div>
+                        ${gearList.length ? `<div class="ic-gears">${gearList.map(([c, r]) => gearBadge(c, r)).join("")}</div>` : ""}</td>`;
                 }).join("")}
             </tr>`;
         }).join("")}</tbody></table></div>`;

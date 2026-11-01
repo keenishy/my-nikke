@@ -471,17 +471,16 @@ p.center { text-align: center; }
 .xtok { display: inline-block; padding: 0 4px; border-radius: 4px; background: var(--bg); font-size: 0.8rem; }
 .xtok.k-pickup { color: #ED7D31; } .xtok.k-dust { color: #3fbf5f; } .xtok.k-pilgrim { color: #5B9BD5; } .xtok.k-unknown { color: var(--danger); text-decoration: underline wavy; }
 
-/* 특특요 목록: 칸 하나를 두 줄로 (총 개수 + 회차별) */
+/* 특특요 목록: 위 = 총 개수 + 회차별 숫자(흐리게), 아래 = 획득 장비 */
 .ic-table th { min-width: 104px; }
-.ic-table td.ic-cell { padding: 8px 10px; }
-.ic-top { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 24px; }
-.ic-total { font-size: 1.15rem; line-height: 1; }
+.ic-table td.ic-cell { padding: 7px 8px; }
+.ic-top { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.ic-total { font-size: 1.1rem; line-height: 1.2; }
 .ic-total.good { color: var(--max); }
-.ic-dots { display: inline-flex; flex-wrap: wrap; gap: 2px; max-width: 64px; }
-.gdot { width: 7px; height: 7px; border-radius: 50%; background: var(--star); display: inline-block; }
-.gdot.c-ely { background: #74c0fc; } .gdot.c-mis { background: #e599f7; } .gdot.c-tet { background: #ffd43b; } .gdot.c-pil { background: #ffa94d; } .gdot.c-abn { background: #ff8787; }
 .ic-memo { color: var(--muted); font-size: 0.8rem; cursor: help; }
-.ic-line { margin-top: 3px; font-size: 0.72rem; color: var(--muted); letter-spacing: 0.03em; }
-.ic-line .fmods { font-size: 0.72rem; }
+.ic-line { font-size: 0.66rem; color: var(--faint); letter-spacing: 0.02em; }
+.ic-line .fmods { font-size: 0.66rem; font-weight: 600; opacity: 0.6; }
+.ic-gears { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin: 4px auto 0; max-width: 150px; white-space: normal; }
+.ic-gears .gear { margin: 0; font-size: 0.64rem; padding: 0 3px; line-height: 1.5; }
 .ic-table .small-boss { font-size: 0.72rem; }
 .dash-table td.num { text-align: right; white-space: nowrap; }
