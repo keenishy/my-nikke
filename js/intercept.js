@@ -54,9 +54,13 @@ function renderList() {
         <tbody>${monthRow(list)}${list.map((d) => {
             const res = Object.values(d.results || {});
             const anyFb = res.some((x) => x.fb);
-            const bosses = [...new Set(res.map((x) => x.boss))];
+            // 날짜 칸에는 그날 가장 많이 친 보스만, 다른 보스를 친 계정은 그 칸에 보스 이름을 표시
+            const count = {};
+            for (const x of res) if (!x.skip) count[x.boss] = (count[x.boss] || 0) + 1;
+            const main = Object.entries(count).sort((p, q) => q[1] - p[1])[0]?.[0] || res[0]?.boss || "";
+            const others = Object.keys(count).length - 1;
             return `<tr data-date="${d.date}">
-                <td class="sticky"><b>${dayLabel(d.date)}</b>${anyFb ? ` <span class="fbtag">풀버</span>` : ""}<div class="muted small-boss">${esc(bosses.join(", "))}</div></td>
+                <td class="sticky"><b>${dayLabel(d.date)}</b>${anyFb ? ` <span class="fbtag">풀버</span>` : ""}<div class="muted small-boss">${esc(main)}${others > 0 ? ` <span class="ic-boss-more">외 ${others}</span>` : ""}</div></td>
                 ${ACCOUNTS.map((a) => {
                     const x = d.results?.[a];
                     if (!x) return `<td class="dim">-</td>`;
@@ -70,7 +74,7 @@ function renderList() {
                     const total = actualOf(x), good = total >= expectedOf(x, d.date);
                     const tip = [`일반 ${mods}`, fmods && `풀버 +${fmods}`, gearList.length && `장비 ${gearList.map(([c, r]) => gearName(c, r)).join(", ")}`, x.memo && `메모 ${x.memo}`].filter(Boolean).join("\n");
                     return `<td class="ic-cell" title="${esc(tip)}">
-                        <div class="ic-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</span>${memo}</div>
+                        ${x.boss !== main ? `<div class="ic-boss">${esc(x.boss)}</div>` : ""}<div class="ic-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</span>${memo}</div>
                         ${gearList.length ? `<div class="ic-gears">${gearList.map(([c, r]) => gearBadge(c, r)).join("")}</div>` : ""}</td>`;
                 }).join("")}
             </tr>`;

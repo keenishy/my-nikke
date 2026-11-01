@@ -483,4 +483,6 @@ p.center { text-align: center; }
 .ic-gears { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin: 4px auto 0; max-width: 150px; white-space: normal; }
 .ic-gears .gear { margin: 0; font-size: 0.64rem; padding: 0 3px; line-height: 1.5; }
 .ic-table .small-boss { font-size: 0.72rem; }
+.ic-boss-more { color: var(--warn); }
+.ic-boss { display: inline-block; font-size: 0.64rem; font-weight: 700; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-bottom: 2px; }
 .dash-table td.num { text-align: right; white-space: nowrap; }
