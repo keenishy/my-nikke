@@ -22,7 +22,8 @@ function interceptCard(days, rosters) {
         const count = runCountFor(rosters[a]?.synchro, today);
         const status = !x ? `<span class="muted">미입력</span>` : x.skip ? `<span class="muted">미참여</span>`
             : `<b>${x.runs.map((r) => r.mod).join("·")}</b>${x.fb ? ` <span class="fmods">+${x.runs.map((r) => r.fmod).join("·")}</span>` : ""}`;
-        return `<tr class="${x ? "" : "todo"}"><td>${esc(a)}</td><td>${count}회</td><td>${status}</td></tr>`;
+        const total = x && !x.skip ? actualOf(x) : null;
+        return `<tr class="${x ? "" : "todo"}"><td>${esc(a)}</td><td>${count}회</td><td>${status}</td><td class="num">${total == null ? "" : `<b>${total}</b>개`}</td></tr>`;
     }).join("");
     return card(`오늘 특특요 <small class="muted">${today.slice(5).replace("-", "/")} · 05시 기준 · ${done}/${ACCOUNTS.length}</small>`,
         `<table class="dash-table"><tbody>${rows}</tbody></table>`,
