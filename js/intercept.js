@@ -39,7 +39,7 @@ function monthRow(list) {
         }
         if (!has) return `<td class="dim">-</td>`;
         const luck = exp ? ((mod + fmod) / exp) * 100 : 0;
-        return `<td class="ic-cell"><div class="ic-top"><b class="ic-total">${mod + fmod}</b><span class="${luck >= 100 ? "good" : "bad"} small">${luck.toFixed(1)}%</span></div>
+        return `<td class="ic-cell"><div class="ic-cell-top"><b class="ic-total">${mod + fmod}</b><span class="${luck >= 100 ? "good" : "bad"} small">${luck.toFixed(1)}%</span></div>
             <div class="ic-line">일반 ${mod}${fmod ? ` <span class="fmods">+풀버 ${fmod}</span>` : ""}</div></td>`;
     }).join("");
     return `<tr class="sum-row"><td class="sticky"><b>${Number(t.month.slice(5))}월 합계</b><div class="muted">${list.length}일</div></td>${cells}</tr>`;
@@ -74,7 +74,7 @@ function renderList() {
                     const total = actualOf(x), good = total >= expectedOf(x, d.date);
                     const tip = [`일반 ${mods}`, fmods && `풀버 +${fmods}`, gearList.length && `장비 ${gearList.map(([c, r]) => gearName(c, r)).join(", ")}`, x.memo && `메모 ${x.memo}`].filter(Boolean).join("\n");
                     return `<td class="ic-cell" title="${esc(tip)}">
-                        ${x.boss !== main ? `<div class="ic-boss">${esc(x.boss)}</div>` : ""}<div class="ic-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</span>${memo}</div>
+                        ${x.boss !== main ? `<div class="ic-boss">${esc(x.boss)}</div>` : ""}<div class="ic-cell-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</span>${memo}</div>
                         ${gearList.length ? `<div class="ic-gears">${gearList.map(([c, r]) => gearBadge(c, r)).join("")}</div>` : ""}</td>`;
                 }).join("")}
             </tr>`;
@@ -236,7 +236,6 @@ function accCard(a, x, existing) {
     return `<div class="ic-acc ${x.skip ? "skipped" : ""} ${x.fb ? "is-fb" : ""} ${existing ? "" : "untouched"}" data-acc="${esc(a)}" ${existing ? 'data-keep="1"' : ""}>
         <div class="ic-acc-head"><b>${esc(a)}</b>
             <select class="boss">${opt(BOSSES, x.boss)}</select>
-            <label><input type="checkbox" class="fb" ${x.fb ? "checked" : ""}>풀버</label>
             <label><input type="checkbox" class="skip" ${x.skip ? "checked" : ""}>미참여</label>
         </div>
         <div class="ic-runs">${x.runs.map(runHtml).join("")}</div>
@@ -249,6 +248,12 @@ function lastBossFor(acc, date) {
     const prev = sortedDays().find((d) => d.date < date && d.results?.[acc]);
     return prev ? { boss: prev.results[acc].boss } : { boss: "크라켄" };
 }
+
+// 풀버데이 체크 하나로 7계정을 한 번에 켜고 끔 (저장된 날은 그 값, 새 날은 꺼진 채로 시작)
+const setDayFb = (on) => {
+    $("#ic-day-fb").checked = on;
+    document.querySelectorAll("#ic-accounts .ic-acc").forEach((c) => c.classList.toggle("is-fb", on));
+};
 
 function openDay(date) {
     const day = t.days.find((d) => d.date === date);
@@ -264,6 +269,7 @@ function openDay(date) {
     $("#ic-dialog-title").textContent = day ? `${dayLabel(date)} 기록 수정` : `${dayLabel(date)} 새 기록`;
     $("#ic-all-boss").innerHTML = `<option value="">계정별 그대로</option>` + BOSSES.map((b) => `<option>${b}</option>`).join("");
     $("#ic-accounts").innerHTML = ACCOUNTS.map((a) => accCard(a, results[a], !!day?.results?.[a])).join("");
+    setDayFb(!!day && Object.values(day.results || {}).some((x) => x.fb));
     $("#ic-status").textContent = "";
     if (!$("#ic-dialog").open) $("#ic-dialog").showModal();
 }
@@ -281,7 +287,7 @@ function readCards() {
             };
         });
         out[card.dataset.acc] = {
-            boss: card.querySelector(".boss").value, fb: card.querySelector(".fb").checked,
+            boss: card.querySelector(".boss").value, fb: $("#ic-day-fb").checked,
             skip: card.querySelector(".skip").checked, memo: card.querySelector(".memo").value.trim(), runs,
         };
     });
@@ -364,17 +370,7 @@ async function setup() {
 
     $("#ic-date").addEventListener("change", (e) => { if (e.target.value) openDay(e.target.value); });
     $("#ic-all-boss").addEventListener("change", (e) => { if (e.target.value) document.querySelectorAll("#ic-accounts .boss").forEach((s) => (s.value = e.target.value)); });
-    $("#ic-all-fb").addEventListener("click", () => {
-        const boxes = [...document.querySelectorAll("#ic-accounts .fb")];
-        const on = !boxes.every((b) => b.checked);
-        boxes.forEach((b) => {
-            const card = b.closest(".ic-acc");
-            b.checked = on;
-            card.classList.toggle("is-fb", on);
-            card.dataset.keep = "1";
-            card.classList.remove("untouched");
-        });
-    });
+    $("#ic-day-fb").addEventListener("change", (e) => setDayFb(e.target.checked));
     // 카드 안을 건드리면 그 계정은 저장 대상
     const touch = (e) => { const card = e.target.closest(".ic-acc"); if (card) { card.dataset.keep = "1"; card.classList.remove("untouched"); } };
     $("#ic-accounts").addEventListener("input", touch);
@@ -401,7 +397,6 @@ async function setup() {
     });
     $("#ic-accounts").addEventListener("change", (e) => {
         const card = e.target.closest(".ic-acc");
-        if (e.target.classList.contains("fb")) card.classList.toggle("is-fb", e.target.checked);
         if (e.target.classList.contains("skip")) card.classList.toggle("skipped", e.target.checked);
     });
     $("#ic-save").addEventListener("click", saveEditing);

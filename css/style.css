@@ -473,8 +473,9 @@ p.center { text-align: center; }
 
 /* 특특요 목록: 위 = 총 개수 + 회차별 숫자(흐리게), 아래 = 획득 장비 */
 .ic-table th { min-width: 104px; }
+.ic-dayfb { flex-direction: row !important; align-items: center; gap: 6px; font-weight: 700; color: var(--pickup) !important; align-self: flex-end; padding-bottom: 6px; }
 .ic-table td.ic-cell { padding: 7px 8px; }
-.ic-top { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+.ic-cell-top { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
 .ic-total { font-size: 1.1rem; line-height: 1.2; }
 .ic-total.good { color: var(--max); }
 .ic-memo { color: var(--muted); font-size: 0.8rem; cursor: help; }
