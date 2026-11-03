@@ -204,6 +204,7 @@ async function storeSlot(banner, account, key, data) {
     else banner.results[account][key] = data;
     if ($("#banner-dialog").open && g.open === banner) renderBanner();
     if (g.view === "list") renderList();
+    updateRoundButton();
 }
 
 async function saveSlotEdit() {
@@ -330,6 +331,7 @@ function renderStats() {
 }
 
 function render() {
+    updateRoundButton();
     document.querySelectorAll("#gacha-subtabs button").forEach((b) => b.classList.toggle("on", b.dataset.gview === g.view));
     g.view === "list" ? renderList() : renderStats();
 }
@@ -355,6 +357,43 @@ async function runImport() {
     } catch (e) { alert(`가져오지 못했습니다: ${e.message}`); }
     btn.disabled = false;
     btn.textContent = "기존 기록 가져오기";
+}
+
+// ---------- "2회차 x" 칸 정리 ----------
+// 예전 트래커는 메모만 있는 칸을 픽업 1개로 셌기 때문에 "2회차 x" 같은 칸이 이름 없는 픽업으로 들어와 있음
+// → 회차 표시 + 꽝(x)뿐인 칸은 꽝으로 바꾸고 메모에 "N회차"만 남김. 이름이 같이 적힌 칸은 직접 확인
+const ROUND = /\d+\s*회차/;
+function roundSlots() {
+    const fix = [], check = [];
+    for (const b of g.banners) for (const [account, slots] of Object.entries(b.results || {})) for (const [key, slot] of Object.entries(slots)) {
+        if (!ROUND.test(slot.m || "") || !slot.d?.length || !slot.d.every((d) => d.t === "pickup" && !d.n)) continue;
+        const rest = slot.m.replace(ROUND, "").trim();
+        if (/^(x+|꽝)?$/i.test(rest)) fix.push({ banner: b, account, key, slot: { d: [], b: "blank", m: slot.m.match(ROUND)[0].replace(/\s+/g, "") } });
+        else check.push({ banner: b, account, key, m: slot.m });
+    }
+    return { fix, check };
+}
+
+function updateRoundButton() {
+    const { fix } = roundSlots();
+    $("#gacha-rounds").hidden = !fix.length;
+    $("#gacha-rounds").textContent = `「N회차 x」 칸 정리 (${fix.length})`;
+}
+
+async function runRoundFix() {
+    const { fix, check } = roundSlots();
+    const sample = (list, f) => list.slice(0, 8).map(f).join("\n") + (list.length > 8 ? `\n… 외 ${list.length - 8}칸` : "");
+    if (!confirm(`메모가 「2회차 x」처럼 회차 표시와 꽝뿐인데 이름 없는 픽업으로 저장된 칸 ${fix.length}개를 꽝으로 바꿀까요?\n(메모에는 「2회차」만 남깁니다)\n\n${sample(fix, (r) => `· ${r.banner.name} · ${r.account} ${r.key}연`)}`
+        + (check.length ? `\n\n※ 회차 표시와 다른 글자가 같이 있는 ${check.length}칸은 건드리지 않습니다. 직접 확인해 주세요:\n${sample(check, (r) => `· ${r.banner.name} · ${r.account} ${r.key}연: ${r.m.replace(/\s+/g, " ")}`)}` : ""))) return;
+    const btn = $("#gacha-rounds");
+    btn.disabled = true;
+    try {
+        await saveSlots(fix.map((r) => ({ id: r.banner.id, account: r.account, key: r.key, slot: r.slot })), (n) => (btn.textContent = `저장 중… ${n}/${fix.length}`));
+        for (const r of fix) r.banner.results[r.account][r.key] = r.slot;
+        alert(`${fix.length}칸을 꽝으로 정리했습니다.`);
+    } catch (e) { alert(`저장하지 못했습니다: ${e.message}`); }
+    btn.disabled = false;
+    render();
 }
 
 // ---------- 엑셀 색으로 다시 분류 ----------
@@ -443,6 +482,7 @@ export async function initGacha() {
     $("#g-year").addEventListener("change", (e) => { g.year = e.target.value; render(); });
     $("#gacha-new").addEventListener("click", () => openInfo(null));
     $("#gacha-import").addEventListener("click", runImport);
+    $("#gacha-rounds").addEventListener("click", runRoundFix);
     $("#gacha-recolor").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) runRecolor(f); });
     $("#gacha-view").addEventListener("click", (e) => {
         const quick = e.target.closest("[data-quick]");
