@@ -98,10 +98,14 @@ function renderList() {
     }).join("")}</div>` : `<p class="empty">배너가 없습니다. 「+ 새 배너」로 추가하거나 「기존 기록 가져오기」를 눌러 주세요.</p>`);
 }
 
+// 골티는 숫자만 넣어도 "N장"으로 보이고 저장됨
+const goldText = (v) => (/^\s*\d+\s*$/.test(String(v)) ? `${String(v).trim()}장` : String(v ?? ""));
+const dropText = (d) => (d.t === "gold" ? goldText(d.n) || DROP.gold.label : d.n || DROP[d.t]?.label || d.t);
+
 // ---------- 7계정 입력표 ----------
 function slotHtml(slot) {
     if (!slot) return `<span class="slot-empty">·</span>`;
-    const chips = (slot.d || []).map((d) => `<span class="drop ${DROP[d.t]?.cls || ""}${d.x ? " dust" : ""}">${esc(d.n || DROP[d.t]?.label || d.t)}</span>`).join("");
+    const chips = (slot.d || []).map((d) => `<span class="drop ${DROP[d.t]?.cls || ""}${d.x ? " dust" : ""}">${esc(dropText(d))}</span>`).join("");
     const blank = slot.b ? `<span class="drop blank">${BLANK[slot.b]}</span>` : "";
     const memo = slot.m ? `<div class="slot-memo">${esc(slot.m)}</div>` : "";
     return chips + blank + memo || `<span class="slot-empty">·</span>`;
@@ -174,12 +178,14 @@ function renderSlotEditor() {
     for (const el of document.querySelectorAll('#slot-add [data-add="gold"], #slot-blank input[value="blue"], #slot-blank input[value="purple"]')) (el.closest("label") || el).hidden = !!banner.daily;
     $("#slot-drops").innerHTML = data.d.map((d, i) => `<div class="drop-edit">
         <span class="drop ${DROP[d.t].cls}">${DROP[d.t].label}</span>
-        <input data-i="${i}" data-f="n" value="${esc(d.n)}" placeholder="${d.t === "gold" ? "몇 장?" : "누구?"}" ${d.t === "gold" ? "" : 'list="gacha-nikke-names"'}>
+        ${d.t === "gold" ? `<input data-i="${i}" data-f="n" value="${esc(String(d.n || "").replace(/장\s*$/, ""))}" placeholder="몇 장?" inputmode="numeric" class="gold-n"><span class="unit">장</span>`
+            : `<input data-i="${i}" data-f="n" value="${esc(d.n)}" placeholder="누구?" list="gacha-nikke-names">`}
         ${d.t === "gold" ? "" : `<label><input type="checkbox" data-i="${i}" data-f="x" ${d.x ? "checked" : ""}>중복</label>`}
         <button class="btn small" data-del="${i}" aria-label="삭제">✕</button>
     </div>`).join("") || `<p class="muted">아래 버튼으로 뽑은 SSR을 추가하세요.</p>`;
     document.querySelectorAll("#slot-blank input").forEach((r) => (r.checked = r.value === data.b));
     $("#slot-memo").value = data.m;
+    $("#slot-memo-clear").hidden = !data.m;
     $("#slot-clear").hidden = !banner.results?.[account]?.[key]; // 저장된 기록이 있을 때만
 }
 
@@ -352,7 +358,7 @@ async function runImport() {
 }
 
 // ---------- 엑셀 색으로 다시 분류 ----------
-const dropChips = (ds) => ds.map((d) => `<span class="drop ${DROP[d.t]?.cls || ""}${d.x ? " dust" : ""}">${esc(d.n || DROP[d.t]?.label || d.t)}</span>`).join("") || `<span class="muted">-</span>`;
+const dropChips = (ds) => ds.map((d) => `<span class="drop ${DROP[d.t]?.cls || ""}${d.x ? " dust" : ""}">${esc(dropText(d))}</span>`).join("") || `<span class="muted">-</span>`;
 const tokenChips = (ts) => ts.map((t) => `<span class="xtok k-${t.kind}">${esc(t.text)}</span>`).join(" ");
 
 function recolorRows(rows, withMsg) {
@@ -465,14 +471,16 @@ export async function initGacha() {
     $("#slot-drops").addEventListener("input", (e) => {
         const i = e.target.dataset.i;
         if (i === undefined) return;
-        g.slot.data.d[i][e.target.dataset.f] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+        const d = g.slot.data.d[i];
+        d[e.target.dataset.f] = e.target.type === "checkbox" ? e.target.checked : d.t === "gold" ? goldText(e.target.value) : e.target.value;
     });
     $("#slot-drops").addEventListener("click", (e) => {
         const i = e.target.dataset.del;
         if (i !== undefined) { g.slot.data.d.splice(i, 1); renderSlotEditor(); }
     });
     $("#slot-blank").addEventListener("change", (e) => { g.slot.data.b = e.target.value; });
-    $("#slot-memo").addEventListener("input", (e) => { g.slot.data.m = e.target.value; });
+    $("#slot-memo").addEventListener("input", (e) => { g.slot.data.m = e.target.value; $("#slot-memo-clear").hidden = !e.target.value; });
+    $("#slot-memo-clear").addEventListener("click", () => { g.slot.data.m = ""; $("#slot-memo").value = ""; $("#slot-memo-clear").hidden = true; $("#slot-memo").focus(); });
     $("#slot-save").addEventListener("click", saveSlotEdit);
     $("#slot-clear").addEventListener("click", clearSlot);
 

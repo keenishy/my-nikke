@@ -180,6 +180,11 @@ dialog.wide { width: min(1200px, calc(100vw - 24px)); }
 .drop-edit input:not([type]) { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
 .drop-edit label, #slot-blank label { font-size: 0.85rem; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
 #slot-blank { margin-top: 10px; gap: 12px; }
+.drop-edit .unit { font-size: 0.85rem; color: var(--muted); margin-left: -2px; }
+.memo-wrap { position: relative; }
+.memo-wrap input.full { padding-right: 34px; }
+.memo-clear { position: absolute; right: 6px; top: calc(50% + 5px); transform: translateY(-50%); border: 0; background: var(--hover); color: var(--muted); width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; line-height: 1; }
+.memo-clear:hover { color: var(--text); }
 .drop-btn.pickup { color: var(--pickup); } .drop-btn.spook { color: var(--spook); } .drop-btn.pilgrim { color: var(--pilgrim); } .drop-btn.gold { color: var(--gold); }
 
 #info-dialog { width: min(440px, calc(100vw - 24px)); }
