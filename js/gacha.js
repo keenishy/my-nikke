@@ -359,16 +359,20 @@ async function runImport() {
     btn.textContent = "기존 기록 가져오기";
 }
 
-// ---------- "2회차 x" 칸 정리 ----------
-// 예전 트래커는 메모만 있는 칸을 픽업 1개로 셌기 때문에 "2회차 x" 같은 칸이 이름 없는 픽업으로 들어와 있음
-// → 회차 표시 + 꽝(x)뿐인 칸은 꽝으로 바꾸고 메모에 "N회차"만 남김. 이름이 같이 적힌 칸은 직접 확인
+// ---------- 예전 기록 정리 ----------
+// 예전 트래커는 메모만 있는 칸을 픽업 1개(또는 10연차)로 셌기 때문에 생긴 칸들
+// ① "2회차 x" 같은 칸이 이름 없는 픽업으로 들어옴 → 꽝으로 바꾸고 메모에 "N회차"만 남김. 이름이 같이 적힌 칸은 직접 확인
+// ② 날짜만 적힌 칸(배너 시작일 메모)이 10연차 기록으로 잡힘 → 칸을 지움 (날짜는 배너 시작일에 있음)
 const ROUND = /\d+\s*회차/;
+const DATE_ONLY = /^\s*(\d{2}|\d{4})[.\-/]\d{1,2}[.\-/]\d{1,2}\.?\s*$/;
+const noRealDrop = (slot) => !slot.b && (slot.d || []).every((d) => d.t === "pickup" && !d.n);
 function roundSlots() {
     const fix = [], check = [];
     for (const b of g.banners) for (const [account, slots] of Object.entries(b.results || {})) for (const [key, slot] of Object.entries(slots)) {
+        if (DATE_ONLY.test(slot.m || "") && noRealDrop(slot)) { fix.push({ banner: b, account, key, kind: "date", m: slot.m, slot: { d: [], b: "", m: "" } }); continue; }
         if (!ROUND.test(slot.m || "") || !slot.d?.length || !slot.d.every((d) => d.t === "pickup" && !d.n)) continue;
         const rest = slot.m.replace(ROUND, "").trim();
-        if (/^(x+|꽝)?$/i.test(rest)) fix.push({ banner: b, account, key, slot: { d: [], b: "blank", m: slot.m.match(ROUND)[0].replace(/\s+/g, "") } });
+        if (/^(x+|꽝)?$/i.test(rest)) fix.push({ banner: b, account, key, kind: "round", slot: { d: [], b: "blank", m: slot.m.match(ROUND)[0].replace(/\s+/g, "") } });
         else check.push({ banner: b, account, key, m: slot.m });
     }
     return { fix, check };
@@ -377,20 +381,26 @@ function roundSlots() {
 function updateRoundButton() {
     const { fix } = roundSlots();
     $("#gacha-rounds").hidden = !fix.length;
-    $("#gacha-rounds").textContent = `「N회차 x」 칸 정리 (${fix.length})`;
+    $("#gacha-rounds").textContent = `예전 기록 정리 (${fix.length})`;
 }
 
 async function runRoundFix() {
     const { fix, check } = roundSlots();
     const sample = (list, f) => list.slice(0, 8).map(f).join("\n") + (list.length > 8 ? `\n… 외 ${list.length - 8}칸` : "");
-    if (!confirm(`메모가 「2회차 x」처럼 회차 표시와 꽝뿐인데 이름 없는 픽업으로 저장된 칸 ${fix.length}개를 꽝으로 바꿀까요?\n(메모에는 「2회차」만 남깁니다)\n\n${sample(fix, (r) => `· ${r.banner.name} · ${r.account} ${r.key}연`)}`
+    const rounds = fix.filter((r) => r.kind === "round"), dates = fix.filter((r) => r.kind === "date");
+    if (!confirm(`예전 트래커에서 잘못 들어온 칸 ${fix.length}개를 정리할까요?`
+        + (rounds.length ? `\n\n① 「2회차 x」처럼 회차 표시와 꽝뿐인데 이름 없는 픽업으로 저장된 칸 ${rounds.length}개 → 꽝으로 (메모에는 「2회차」만 남김)\n${sample(rounds, (r) => `· ${r.banner.name} · ${r.account} ${r.key}연`)}` : "")
+        + (dates.length ? `\n\n② 날짜만 적혀 있어 10연차로 잡힌 칸 ${dates.length}개 → 칸 지우기 (날짜는 배너 시작일에 있음)\n${sample(dates, (r) => `· ${r.banner.name} · ${r.account} ${r.key}연: ${r.m}`)}` : "")
         + (check.length ? `\n\n※ 회차 표시와 다른 글자가 같이 있는 ${check.length}칸은 건드리지 않습니다. 직접 확인해 주세요:\n${sample(check, (r) => `· ${r.banner.name} · ${r.account} ${r.key}연: ${r.m.replace(/\s+/g, " ")}`)}` : ""))) return;
     const btn = $("#gacha-rounds");
     btn.disabled = true;
     try {
         await saveSlots(fix.map((r) => ({ id: r.banner.id, account: r.account, key: r.key, slot: r.slot })), (n) => (btn.textContent = `저장 중… ${n}/${fix.length}`));
-        for (const r of fix) r.banner.results[r.account][r.key] = r.slot;
-        alert(`${fix.length}칸을 꽝으로 정리했습니다.`);
+        for (const r of fix) {
+            if (r.kind === "date") delete r.banner.results[r.account][r.key];
+            else r.banner.results[r.account][r.key] = r.slot;
+        }
+        alert(`${fix.length}칸을 정리했습니다.`);
     } catch (e) { alert(`저장하지 못했습니다: ${e.message}`); }
     btn.disabled = false;
     render();

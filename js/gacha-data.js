@@ -96,7 +96,10 @@ export async function saveSlots(rows, onProgress) {
     bannersCache = null;
     for (let i = 0; i < rows.length; i += 400) {
         const batch = writeBatch(db);
-        for (const r of rows.slice(i, i + 400)) batch.update(doc(db, "gacha_banners", r.id), new FieldPath("results", r.account, r.key), r.slot, "edited", true);
+        for (const r of rows.slice(i, i + 400)) {
+            const empty = !r.slot.d.length && !r.slot.b && !r.slot.m.trim();
+            batch.update(doc(db, "gacha_banners", r.id), new FieldPath("results", r.account, r.key), empty ? deleteField() : r.slot, "edited", true);
+        }
         await batch.commit();
         onProgress?.(Math.min(i + 400, rows.length));
     }
