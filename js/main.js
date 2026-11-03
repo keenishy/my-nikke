@@ -106,3 +106,40 @@ document.addEventListener("keydown", (e) => {
     const editable = el.isContentEditable || el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && TEXT_INPUT.test(el.type) && !el.readOnly);
     if (!editable) e.preventDefault();
 });
+
+// 메모 칸에 ✕ 버튼: 글자가 있을 때만 보이고, 누르면 비운 뒤 그 칸에 다시 초점
+// (탭마다 따로 만들지 않고 메모 칸이 화면에 생기면 자동으로 붙임)
+const CLEARABLE = 'input.memo, input[name="note"], input[data-note="memo"], textarea.union-memo';
+function addClear(el) {
+    if (el.dataset.clearable) return;
+    el.dataset.clearable = "1";
+    const wrap = document.createElement("span");
+    wrap.className = `clear-wrap${el.tagName === "TEXTAREA" ? " ta" : ""}`;
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "memo-clear";
+    btn.textContent = "✕";
+    btn.title = "지우기";
+    btn.tabIndex = -1;
+    wrap.appendChild(btn);
+    const sync = () => { btn.hidden = !el.value; };
+    // 코드에서 value를 바꿔도(입력 창을 다시 열 때 등) 버튼 표시가 맞도록
+    const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value");
+    Object.defineProperty(el, "value", { configurable: true, get: () => desc.get.call(el), set: (v) => { desc.set.call(el, v); sync(); } });
+    el.addEventListener("input", sync);
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.addEventListener("click", () => {
+        el.value = "";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        el.focus();
+    });
+    sync();
+}
+const scanClearable = (root) => root.querySelectorAll?.(CLEARABLE).forEach(addClear);
+scanClearable(document);
+new MutationObserver((list) => {
+    for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches(CLEARABLE)) addClear(n); scanClearable(n); }
+}).observe(document.body, { childList: true, subtree: true });

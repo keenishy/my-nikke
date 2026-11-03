@@ -492,3 +492,10 @@ p.center { text-align: center; }
 .ic-boss-more { color: var(--warn); }
 .ic-boss { display: inline-block; font-size: 0.64rem; font-weight: 700; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-bottom: 2px; }
 .dash-table td.num { text-align: right; white-space: nowrap; }
+
+/* 메모 칸 ✕ 버튼 (main.js가 자동으로 붙임) */
+.clear-wrap { position: relative; display: block; min-width: 0; }
+.clear-wrap > input, .clear-wrap > textarea { width: 100%; padding-right: 32px !important; }
+.clear-wrap > .memo-clear { top: 50%; right: 5px; }
+.clear-wrap.ta > .memo-clear { top: 8px; transform: none; }
+.ic-acc-foot .clear-wrap { flex: 1; }
