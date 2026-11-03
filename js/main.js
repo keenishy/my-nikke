@@ -97,3 +97,12 @@ initCollection().catch((e) => {
     console.error(e);
     document.getElementById("view").innerHTML = `<p class="empty">도감을 불러오지 못했습니다: ${e.message}</p>`;
 });
+
+// 글자 칸 밖에서 백스페이스를 누르면 일부 브라우저(웨일 등)는 이전 페이지로 가 버리므로 막음
+const TEXT_INPUT = /^(text|search|number|email|url|tel|password|date|time|datetime-local|month|week)$/;
+document.addEventListener("keydown", (e) => {
+    if (e.key !== "Backspace" || e.defaultPrevented) return;
+    const el = e.target;
+    const editable = el.isContentEditable || el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && TEXT_INPUT.test(el.type) && !el.readOnly);
+    if (!editable) e.preventDefault();
+});
