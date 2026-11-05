@@ -514,7 +514,8 @@ export async function initGacha() {
         const t = e.target.dataset.add;
         if (!t) return;
         g.slot.data.d.push({ t, n: "", x: false });
-        if (g.slot.data.b) g.slot.data.b = "";
+        // SSR을 넣으면 꽝·올블루·올퍼플은 풀지만, 골티는 뽑기 결과가 아니라 마일리지라 꽝과 같이 둘 수 있음
+        if (g.slot.data.b && t !== "gold") g.slot.data.b = "";
         renderSlotEditor();
         $(`#slot-drops input[data-i="${g.slot.data.d.length - 1}"]`)?.focus();
     });
