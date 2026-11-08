@@ -14,10 +14,11 @@
 //   GET /union-raid?key=...&guild=1964&season=1000045[&live=1]
 //                                 → 유니온 레이드 시즌 기록 (로그인 쿠키 계정이 속한 유니온만 받을 수 있음)
 //   GET /union-members?key=...&guild=1964 → 유니온 전체 멤버 (닉네임·레벨·싱크로, 같은 제한)
+//   GET /daily?key=...           → 계정별 시프티패드 매일 미션 (보관함·파견·요격·아레나·타워·미션 포인트)
 
 const API = "https://api.blablalink.com/api/";
 const AREA = 83; // 한국 서버
-const VERSION = "2026-10-31b"; // 허브에서 배포된 코드가 최신인지 확인용
+const VERSION = "2026-11-08"; // 허브에서 배포된 코드가 최신인지 확인용
 const COMMON = { game_id: "29080", area_id: "global", source: "pc_web", intl_game_id: "29080", language: "ko", env: "prod" };
 
 const cors = {
@@ -105,6 +106,18 @@ export default {
 
       // 받은 원본 그대로 이어 붙여서 돌려줌 (정리는 허브 쪽에서)
       return reply(`{"account":${JSON.stringify(name)},"fetched_at":${JSON.stringify(new Date().toISOString())},"characters":${chars},"details":[${details.join(",")}],"outpost":${outpost}}`);
+    }
+
+    if (url.pathname === "/daily") {
+      // 시프티패드 「매일 미션」: 계정 번호를 지정하는 요청이라 기본 쿠키 하나로 계정마다 받음
+      const out = {};
+      for (const [name, openid] of Object.entries(accounts)) {
+        const text = await calm(env, "game/proxy/Game/GetUserDailyContentsProgress", { intl_open_id: openid, nikke_area_id: AREA });
+        const code = codeOf(text);
+        if (code === 300001) return reply({ error: "블라블라 로그인 쿠키가 만료됐습니다. BLA_COOKIE를 다시 넣어 주세요." }, 401);
+        out[name] = code === 0 ? (JSON.parse(text).data?.daily_progress?.[0] || {}) : { error: `받지 못함 (코드 ${code})` };
+      }
+      return reply({ version: VERSION, fetched_at: new Date().toISOString(), accounts: out });
     }
 
     if (url.pathname === "/unions") {

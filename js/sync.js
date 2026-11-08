@@ -16,6 +16,7 @@ async function callWorker(path, params = {}) {
 export const checkWorker = () => callWorker("/");
 export const fetchUnions = () => callWorker("/unions");
 export const fetchUnionMembers = (guild) => callWorker("/union-members", { guild });
+export const fetchDaily = () => callWorker("/daily");
 export const fetchUnionRaid = (guild, season, live = false) => callWorker("/union-raid", { guild, season, ...(live ? { live: "1" } : {}) });
 
 const PARTS = ["head", "torso", "arm", "leg"];

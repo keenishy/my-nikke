@@ -519,3 +519,17 @@ p.center { text-align: center; }
 .ach-acc.ok { background: var(--max); border-color: var(--max); color: #0f1117; font-weight: 700; }
 .ach-acc small { font-size: 0.7rem; }
 @media (max-width: 640px) { #ach-list { grid-template-columns: 1fr; } }
+
+/* 홈: 시프티패드 매일 미션 */
+.daily-card { grid-column: 1 / -1; }
+.daily-table th { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-align: center; padding: 4px 6px; white-space: nowrap; }
+.daily-table td { text-align: center; white-space: nowrap; }
+.daily-table td:first-child { text-align: left; }
+.warn-num { color: var(--warn); }
+.box-cell { display: flex; align-items: center; gap: 6px; min-width: 150px; }
+.box-cell b { min-width: 46px; text-align: right; }
+.box-bar { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.box-bar > div { height: 100%; background: var(--max); }
+.box-bar.mid > div { background: var(--warn); }
+.box-bar.full > div { background: var(--danger); }
+.small-note { font-size: 0.75rem; margin: 6px 0 0; }

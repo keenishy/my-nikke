@@ -4,7 +4,7 @@ import { loadDays, gameDate, runCountFor, expectedOf, actualOf, excludedFromDist
 import { loadRaids, best, fmtScore } from "./raid-data.js";
 import { loadBanners, accountSummary, isActiveDaily } from "./gacha-data.js";
 import { openTodayEntry } from "./intercept.js";
-import { checkWorker, getAccessKey } from "./sync.js";
+import { checkWorker, getAccessKey, fetchDaily } from "./sync.js";
 import { downloadBackup, readBackup, restoreBackup } from "./backup.js";
 import { achievementsCardHtml, wireAchievements } from "./achievements.js";
 
@@ -101,6 +101,57 @@ function accountCard(rosters, meta) {
         `<table class="dash-table"><tbody>${rows}</tbody></table>`);
 }
 
+// ---------- 시프티패드 매일 미션 (보관함·파견·요격·아레나·타워·미션) ----------
+// 하루 단위로 바뀌는 값이라 Firebase에 저장하지 않고 이 브라우저에만 기억, 홈을 열 때 15분 지났으면 다시 받음
+const DAILY_KEY = "hub_daily";
+const readShifty = () => { try { return JSON.parse(localStorage.getItem(DAILY_KEY) || "null"); } catch { return null; } };
+const left = (n) => (n > 0 ? `<b class="warn-num">${n}</b>` : `<span class="muted">0</span>`);
+
+function shiftyRow(a, d) {
+    if (!d) return `<tr><td>${esc(a)}</td><td colspan="8" class="muted">데이터 없음</td></tr>`;
+    if (d.error) return `<tr><td>${esc(a)}</td><td colspan="8" class="muted">${esc(d.error)}</td></tr>`;
+    const box = Math.round((d.outpost_battle_storage_fullness || 0) * 1000) / 10;
+    const towers = d.tower_daily_info_list || [];
+    const towerLeft = towers.filter((t) => t.is_opened).reduce((s, t) => s + (t.remaining_count || 0), 0);
+    const towerMax = towers.filter((t) => t.is_opened).length * 3;
+    const got = d.daily_mission_received_points || 0, can = d.daily_mission_receivable_points || 0;
+    const sim = d.sim_room_daily_best_record?.chapter ? `${d.sim_room_daily_best_record.chapter}-${d.sim_room_daily_best_record.difficulty}` : "---";
+    return `<tr><td>${esc(a)}</td>
+        <td><div class="box-cell"><div class="box-bar ${box >= 90 ? "full" : box >= 70 ? "mid" : ""}"><div style="width:${Math.min(box, 100)}%"></div></div><b class="${box >= 90 ? "bad" : ""}">${box}%</b></div></td>
+        <td title="수령 가능 / 파견 중">${d.dispatch_completed_count ? `<b class="warn-num">${d.dispatch_completed_count}</b>` : "0"}/${d.dispatch_in_progress_count ?? 0}</td>
+        <td>${left(d.intercept_remaining_tickets || 0)}</td>
+        <td title="루키 / 스페셜">${left(d.rookie_arena_remaining_count || 0)} · ${left(d.special_arena_remaining_count || 0)}</td>
+        <td>${left(d.counsel_remaining_count || 0)}</td>
+        <td>${left(towerLeft)}<span class="muted">/${towerMax}</span></td>
+        <td title="받은 포인트 (+받을 수 있는 포인트) / 100">${got}${can ? `<b class="warn-num">(+${can})</b>` : ""}<span class="muted">/100</span></td>
+        <td>${sim}</td></tr>`;
+}
+
+function shiftyCard() {
+    const saved = readShifty();
+    const reset = new Date(`${gameDate()}T05:00:00+09:00`).getTime();
+    const stale = saved && new Date(saved.fetched_at).getTime() < reset;
+    const body = saved ? `<div class="table-wrap"><table class="dash-table daily-table"><thead><tr><th></th><th>보관함</th><th>파견</th><th>요격</th><th>아레나</th><th>상담</th><th>타워</th><th>일일 미션</th><th>시뮬룸</th></tr></thead>
+        <tbody>${ACCOUNTS.map((a) => shiftyRow(a, saved.accounts?.[a])).join("")}</tbody></table></div>
+        <p class="muted small-note">주황 숫자 = 아직 남은 것 · 파견은 수령 가능/파견 중 · 아레나는 루키·스페셜 남은 횟수${stale ? " · <b class=\"bad\">오늘 05시 이전에 받은 값이라 새로고침이 필요합니다</b>" : ""}</p>`
+        : `<p class="muted">아직 받지 않았습니다. 「새로고침」을 눌러 주세요.</p>`;
+    return `<section class="dash-card daily-card"><div class="dash-head"><h3>오늘 할 일 <small class="muted">시프티패드 매일 미션${saved ? ` · ${new Date(saved.fetched_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 기준` : ""}</small></h3>
+        <span><span class="muted" id="daily-status"></span> <button class="btn small" id="daily-refresh">새로고침</button></span></div>${body}</section>`;
+}
+
+async function refreshShifty(view) {
+    const status = $("#daily-status");
+    if (status) status.textContent = "받는 중…";
+    try {
+        const r = await fetchDaily();
+        localStorage.setItem(DAILY_KEY, JSON.stringify({ fetched_at: r.fetched_at, accounts: r.accounts }));
+        const card = view.querySelector(".daily-card");
+        if (card) card.outerHTML = shiftyCard();
+        wireShifty(view);
+    } catch (e) { if (status) status.textContent = `실패: ${e.message}`; }
+}
+function wireShifty(view) { $("#daily-refresh")?.addEventListener("click", () => refreshShifty(view)); }
+
 // 블라블라 쿠키 상태: 홈을 열 때마다 확인하면 Worker·블라블라 요청이 늘어나므로 1시간에 한 번만 확인
 const COOKIE_CHECK_KEY = "hub_cookie_check";
 const COOKIE_LABEL = { BLA_COOKIE: "기본 쿠키 (케니 · 도감·LOVEABLE)" };
@@ -131,6 +182,7 @@ export async function renderDashboard() {
         <span class="spacer"></span><span class="muted" id="backup-status"></span><button class="btn" id="backup-btn" title="모든 기록을 JSON 파일 하나로 내려받습니다">백업 다운로드</button>
         <label class="btn" title="백업 파일로 기록을 되돌립니다">백업 복원<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
     <div class="dash-grid">
+        ${shiftyCard()}
         ${interceptCard(days, rosters)}
         ${dailyCard(banners)}
         ${interceptMonthCard(days)}
@@ -140,6 +192,9 @@ export async function renderDashboard() {
         ${accountCard(rosters, meta)}
         ${achCard}
     </div>`;
+    wireShifty(view);
+    const shifty = readShifty();
+    if (getAccessKey() && (!shifty || Date.now() - new Date(shifty.fetched_at).getTime() > 15 * 60 * 1000)) refreshShifty(view);
     $("#backup-btn").addEventListener("click", async (e) => {
         const btn = e.currentTarget, status = $("#backup-status");
         btn.disabled = true;
