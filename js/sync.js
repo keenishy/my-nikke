@@ -14,6 +14,14 @@ async function callWorker(path, params = {}) {
 }
 
 export const checkWorker = () => callWorker("/");
+
+// 쿠키 확인 결과를 기억 (홈 경고가 1시간 동안 이 값을 씀). 연동 설정 창에서 확인해도 홈에 바로 반영
+export const COOKIE_CHECK_KEY = "hub_cookie_check";
+export function rememberCookieCheck(r) {
+    const saved = { at: Date.now(), cookies: { BLA_COOKIE: r.cookie, ...(r.union_cookies || {}) } };
+    localStorage.setItem(COOKIE_CHECK_KEY, JSON.stringify(saved));
+    return saved;
+}
 export const fetchUnions = () => callWorker("/unions");
 export const fetchUnionMembers = (guild) => callWorker("/union-members", { guild });
 export const fetchDaily = () => callWorker("/daily");

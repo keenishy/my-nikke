@@ -3,7 +3,7 @@ import { loadNikkeList, loadCubeNames, cubeName, portraitUrl, loadRoleData, load
     nikkeIcons, rareClass, optionBadge, favoriteInfo, OPTION_BADGE, RECYCLE, RECYCLE_BY_CLASS, RECYCLE_BY_CORP } from "./meta.js";
 import { loadRosters, saveRoster, db } from "./store.js";
 import { doc, getDoc, getDocs, setDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { fetchAccount, checkWorker, getAccessKey, setAccessKey } from "./sync.js";
+import { fetchAccount, checkWorker, getAccessKey, setAccessKey, rememberCookieCheck } from "./sync.js";
 import { loadReleaseDates, loadBanners } from "./gacha-data.js";
 
 // 출시일: 출시일 목록 파일 + 가챠 기록의 (복각이 아닌) 배너 시작일 중 가장 이른 날짜
@@ -316,6 +316,7 @@ async function testKey() {
     $("#key-status").textContent = "확인 중…";
     try {
         const r = await checkWorker();
+        rememberCookieCheck(r);
         const extra = Object.entries(r.union_cookies || {}).map(([k, v]) => `${k} ${v}`).join(" · ");
         $("#key-status").textContent = (r.cookie === "ok" ? `연결 정상 · 블라블라 쿠키 정상 · 계정 ${r.accounts.length}개` : `연결은 됐지만 블라블라 쿠키가 ${r.cookie}입니다. Cloudflare의 BLA_COOKIE를 새로 넣어 주세요.`) + (extra ? ` · 유니온 쿠키: ${extra}` : "");
     } catch (e) { $("#key-status").textContent = `실패: ${e.message}`; }

@@ -4,7 +4,7 @@ import { loadDays, gameDate, runCountFor, expectedOf, actualOf, excludedFromDist
 import { loadRaids, best, fmtScore } from "./raid-data.js";
 import { loadBanners, accountSummary, isActiveDaily } from "./gacha-data.js";
 import { openTodayEntry } from "./intercept.js";
-import { checkWorker, getAccessKey, fetchDaily } from "./sync.js";
+import { checkWorker, getAccessKey, fetchDaily, COOKIE_CHECK_KEY, rememberCookieCheck } from "./sync.js";
 import { downloadBackup, readBackup, restoreBackup } from "./backup.js";
 import { achievementsCardHtml, wireAchievements } from "./achievements.js";
 
@@ -153,7 +153,6 @@ async function refreshShifty(view) {
 function wireShifty(view) { $("#daily-refresh")?.addEventListener("click", () => refreshShifty(view)); }
 
 // 블라블라 쿠키 상태: 홈을 열 때마다 확인하면 Worker·블라블라 요청이 늘어나므로 1시간에 한 번만 확인
-const COOKIE_CHECK_KEY = "hub_cookie_check";
 const COOKIE_LABEL = { BLA_COOKIE: "기본 쿠키 (케니 · 도감·LOVEABLE)" };
 async function cookieWarning() {
     if (!getAccessKey()) return "";
@@ -161,15 +160,14 @@ async function cookieWarning() {
     try { saved = JSON.parse(localStorage.getItem(COOKIE_CHECK_KEY) || "null"); } catch {}
     if (!saved || Date.now() - saved.at > 3600 * 1000) {
         try {
-            const r = await checkWorker();
-            saved = { at: Date.now(), cookies: { BLA_COOKIE: r.cookie, ...(r.union_cookies || {}) } };
-            localStorage.setItem(COOKIE_CHECK_KEY, JSON.stringify(saved));
+            saved = rememberCookieCheck(await checkWorker());
         } catch (e) { return `<p class="warn">블라블라 연결을 확인하지 못했습니다: ${esc(e.message)}</p>`; }
     }
     const bad = Object.entries(saved.cookies).filter(([, v]) => v !== "ok");
     if (!bad.length) return "";
     return `<p class="warn">블라블라 쿠키가 만료됐습니다: <b>${bad.map(([k]) => esc(COOKIE_LABEL[k] || k)).join(", ")}</b><br>
-        그 계정으로 블라블라에 다시 로그인해서 cookie를 복사한 뒤, Cloudflare Worker의 같은 이름 비밀값에 새로 넣어 주세요. (확인 ${new Date(saved.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })})</p>`;
+        그 계정으로 블라블라에 다시 로그인해서 cookie를 복사한 뒤, Cloudflare Worker의 같은 이름 비밀값에 새로 넣어 주세요. (확인 ${new Date(saved.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })})
+        <button class="btn small" id="cookie-recheck">지금 다시 확인</button></p>`;
 }
 
 export async function renderDashboard() {
@@ -193,6 +191,13 @@ export async function renderDashboard() {
         ${achCard}
     </div>`;
     wireShifty(view);
+    // 쿠키를 바꿔 넣은 뒤 1시간을 기다리지 않고 바로 확인
+    $("#cookie-recheck")?.addEventListener("click", (e) => {
+        e.currentTarget.disabled = true;
+        e.currentTarget.textContent = "확인 중…";
+        localStorage.removeItem(COOKIE_CHECK_KEY);
+        renderDashboard();
+    });
     const shifty = readShifty();
     if (getAccessKey() && (!shifty || Date.now() - new Date(shifty.fetched_at).getTime() > 15 * 60 * 1000)) refreshShifty(view);
     $("#backup-btn").addEventListener("click", async (e) => {
