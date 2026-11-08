@@ -279,7 +279,7 @@ td .dks { margin-top: 4px; }
 
 /* ---------- 특특요 ---------- */
 .ic-table { border-collapse: collapse; width: 100%; }
-.ic-table th, .ic-table td { border-bottom: 1px solid var(--border); padding: 7px 9px; text-align: center; vertical-align: top; font-size: 0.85rem; white-space: nowrap; }
+.ic-table th, .ic-table td { border-bottom: 1px solid var(--border); padding: 7px 9px; text-align: center; vertical-align: top; font-size: 0.97rem; white-space: nowrap; }
 .ic-table th { position: sticky; top: 0; background: var(--card); z-index: 1; }
 .ic-table .sticky { position: sticky; left: 0; background: var(--card); text-align: left; z-index: 2; }
 .ic-table tbody tr { cursor: pointer; }
@@ -480,17 +480,20 @@ p.center { text-align: center; }
 .ic-table th { min-width: 104px; }
 .ic-dayfb { flex-direction: row !important; align-items: center; gap: 6px; font-weight: 700; color: var(--pickup) !important; align-self: flex-end; padding-bottom: 6px; }
 .ic-table td.ic-cell { padding: 7px 8px; }
-.ic-cell-top { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
-.ic-total { font-size: 1.1rem; line-height: 1.2; }
+.ic-cell-top { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ic-total { font-size: 1.3rem; line-height: 1.1; }
 .ic-total.good { color: var(--max); }
-.ic-memo { color: var(--muted); font-size: 0.8rem; cursor: help; }
-.ic-line { font-size: 0.66rem; color: var(--faint); letter-spacing: 0.02em; }
-.ic-line .fmods { font-size: 0.66rem; font-weight: 600; opacity: 0.6; }
-.ic-gears { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin: 4px auto 0; max-width: 150px; white-space: normal; }
-.ic-gears .gear { margin: 0; font-size: 0.64rem; padding: 0 3px; line-height: 1.5; }
-.ic-table .small-boss { font-size: 0.72rem; }
+.ic-memo { color: var(--muted); font-size: 0.92rem; cursor: help; }
+.ic-line { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.02em; line-height: 1.3; }
+.ic-line.fmods { color: var(--pickup); font-size: 0.8rem; font-weight: 600; opacity: 0.85; }
+.ic-lines { display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.ic-sum { display: inline-flex; flex-direction: column; align-items: center; }
+.ic-luck { font-size: 0.78rem; font-weight: 600; }
+.ic-gears { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin: 5px auto 0; max-width: 170px; white-space: normal; }
+.ic-gears .gear { margin: 0; font-size: 0.76rem; padding: 0 4px; line-height: 1.5; }
+.ic-table .small-boss { font-size: 0.85rem; }
 .ic-boss-more { color: var(--warn); }
-.ic-boss { display: inline-block; font-size: 0.64rem; font-weight: 700; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-bottom: 2px; }
+.ic-boss { display: inline-block; font-size: 0.76rem; font-weight: 700; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-bottom: 2px; }
 .dash-table td.num { text-align: right; white-space: nowrap; }
 
 /* 메모 칸 ✕ 버튼 (main.js가 자동으로 붙임) */

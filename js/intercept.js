@@ -39,8 +39,8 @@ function monthRow(list) {
         }
         if (!has) return `<td class="dim">-</td>`;
         const luck = exp ? ((mod + fmod) / exp) * 100 : 0;
-        return `<td class="ic-cell"><div class="ic-cell-top"><b class="ic-total">${mod + fmod}</b><span class="${luck >= 100 ? "good" : "bad"} small">${luck.toFixed(1)}%</span></div>
-            <div class="ic-line">일반 ${mod}${fmod ? ` <span class="fmods">+풀버 ${fmod}</span>` : ""}</div></td>`;
+        return `<td class="ic-cell"><div class="ic-cell-top"><span class="ic-sum"><b class="ic-total">${mod + fmod}</b><span class="${luck >= 100 ? "good" : "bad"} ic-luck">${luck.toFixed(1)}%</span></span>
+            <span class="ic-lines"><span class="ic-line">일반 ${mod}</span>${fmod ? `<span class="ic-line fmods">풀버 +${fmod}</span>` : ""}</span></div></td>`;
     }).join("");
     return `<tr class="sum-row"><td class="sticky"><b>${Number(t.month.slice(5))}월 합계</b><div class="muted">${list.length}일</div></td>${cells}</tr>`;
 }
@@ -74,7 +74,7 @@ function renderList() {
                     const total = actualOf(x), good = total >= expectedOf(x, d.date);
                     const tip = [`일반 ${mods}`, fmods && `풀버 +${fmods}`, gearList.length && `장비 ${gearList.map(([c, r]) => gearName(c, r)).join(", ")}`, x.memo && `메모 ${x.memo}`].filter(Boolean).join("\n");
                     return `<td class="ic-cell" title="${esc(tip)}">
-                        ${x.boss !== main ? `<div class="ic-boss">${esc(x.boss)}</div>` : ""}<div class="ic-cell-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-line">${mods}${fmods ? ` <span class="fmods">+${fmods}</span>` : ""}${odd}</span>${memo}</div>
+                        ${x.boss !== main ? `<div class="ic-boss">${esc(x.boss)}</div>` : ""}<div class="ic-cell-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-lines"><span class="ic-line">${mods}${odd}</span>${fmods ? `<span class="ic-line fmods">+${fmods}</span>` : ""}</span>${memo}</div>
                         ${gearList.length ? `<div class="ic-gears">${gearList.map(([c, r]) => gearBadge(c, r)).join("")}</div>` : ""}</td>`;
                 }).join("")}
             </tr>`;
