@@ -56,6 +56,30 @@ function filtered() {
         (!g.year || (b.start || "").startsWith(g.year)));
 }
 
+// 단차는 SSR이 나온 날만 적고 나머지는 꽝: 빈칸(날짜×계정)을 한 번에 꽝으로 채움
+function emptyDailyCells(banners, last, first = "") {
+    const out = [];
+    for (const b of banners) for (const date of dailyDates(b, gameDate())) {
+        if (date > last || date < first) continue;
+        for (const account of ACCOUNTS) if (!b.results?.[account]?.[date]) out.push({ b, account, date });
+    }
+    return out;
+}
+
+async function fillDailyBlank(banners, last, label, first = "") {
+    const cells = emptyDailyCells(banners, last, first);
+    if (!cells.length) { alert("채울 빈칸이 없습니다."); return; }
+    if (!confirm(`${label} 빈칸 ${cells.length}개를 꽝으로 채울까요?\n(SSR이 나온 칸은 그대로 둡니다)`)) return;
+    try {
+        await saveSlots(cells.map((c) => ({ id: c.b.id, account: c.account, key: c.date, slot: BLANK_SLOT() })));
+        for (const c of cells) ((c.b.results ||= {})[c.account] ||= {})[c.date] = BLANK_SLOT();
+        if ($("#banner-dialog").open && g.open) renderBanner();
+        if (g.view === "list") renderList();
+    } catch (e) { alert(`저장하지 못했습니다: ${e.message}`); }
+}
+
+const yesterday = () => { const d = new Date(`${gameDate()}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+
 // 오늘 진행 중인 매일 무료 1뽑을 한 표에서: 줄 = 배너, 열 = 계정
 function todayDailyHtml() {
     const today = gameDate();
@@ -63,7 +87,8 @@ function todayDailyHtml() {
     if (!active.length) return "";
     const done = active.reduce((t, b) => t + ACCOUNTS.filter((a) => b.results?.[a]?.[today]).length, 0);
     return `<section class="daily-today">
-        <h3 class="sec">오늘 무료 1뽑 <small class="muted">${md(today)} · 05시 기준 · ${done}/${active.length * ACCOUNTS.length}</small></h3>
+        <h3 class="sec">오늘 무료 1뽑 <small class="muted">${md(today)} · 05시 기준 · ${done}/${active.length * ACCOUNTS.length}</small>
+            ${done < active.length * ACCOUNTS.length ? `<button class="btn small" id="daily-fill-today" title="오늘 아직 안 적은 칸을 모두 꽝으로">남은 칸 모두 꽝</button>` : ""}</h3>
         <div class="table-wrap"><table class="pulls daily">
             <thead><tr><th class="sticky">배너</th>${ACCOUNTS.map((a) => `<th>${esc(a)}</th>`).join("")}</tr></thead>
             <tbody>${active.map((b) => `<tr><td class="sticky"><button class="linkish" data-open="${esc(b.id)}">${elementIcon(elementOf(b))}${esc(b.name)}</button>${b.end ? `<div class="muted">~${md(b.end)}</div>` : ""}</td>${ACCOUNTS.map((a) => {
@@ -157,7 +182,9 @@ function renderBanner() {
                 return `<td>${s.pulls ? `<b>${s.pulls}${unit}</b><div>픽업 ${s.pickup}${s.spook ? ` · 픽뚫 ${s.spook}` : ""}${s.pilgrim ? ` · 필그림 ${s.pilgrim}` : ""}${s.gold ? ` · 골티 ${s.gold}` : ""}</div>${s.firstPickup ? `<div class="muted">첫 픽업 ${s.firstPickup}${unit}</div>` : ""}` : "-"}</td>`;
             }).join("")}</tr></tfoot>
         </table></div>
-        ${b.daily ? (rows.length ? "" : `<p class="muted center">시작일이 되면 날짜 줄이 생깁니다. 「정보 수정」에서 시작일을 확인해 주세요.</p>`) : `<div class="row center"><button class="btn" id="more-rows">+ 50연차 더 보기</button></div>`}`;
+        ${b.daily ? (rows.length ? `<div class="row center">
+            <button class="btn" data-fill="yesterday" title="SSR이 나온 칸은 그대로 두고 나머지 빈칸을 꽝으로">어제까지 빈칸 꽝으로</button>
+            <button class="btn" data-fill="today">오늘까지 빈칸 꽝으로</button></div>` : `<p class="muted center">시작일이 되면 날짜 줄이 생깁니다. 「정보 수정」에서 시작일을 확인해 주세요.</p>`) : `<div class="row center"><button class="btn" id="more-rows">+ 50연차 더 보기</button></div>`}`;
     if (scroll) { const w = $("#banner-body .pulls-wrap"); w.scrollTop = scroll[0]; w.scrollLeft = scroll[1]; }
     if (n) fillBannerExtra(n);
 }
@@ -497,6 +524,10 @@ export async function initGacha() {
     $("#gacha-view").addEventListener("click", (e) => {
         const quick = e.target.closest("[data-quick]");
         if (quick) return quickDaily(quick);
+        if (e.target.id === "daily-fill-today") {
+            const t = gameDate();
+            return fillDailyBlank(g.banners.filter((b) => isActiveDaily(b, t)), t, `오늘(${md(t)}) 남은`, t);
+        }
         const cell = e.target.closest("td.slot[data-bid]");
         if (cell) return openSlot(g.banners.find((b) => b.id === cell.dataset.bid), cell.dataset.acc, cell.dataset.key);
         const id = e.target.closest("[data-open]")?.dataset.open || e.target.closest(".banner-row")?.dataset.id;
@@ -507,6 +538,9 @@ export async function initGacha() {
         const cell = e.target.closest("td.slot");
         if (cell) return openSlot(g.open, cell.dataset.acc, cell.dataset.key);
         if (e.target.id === "more-rows") { g.rows += 50; renderBanner(); }
+        const fill = e.target.closest("[data-fill]")?.dataset.fill;
+        if (fill === "yesterday") fillDailyBlank([g.open], yesterday(), `어제(${md(yesterday())})까지`);
+        if (fill === "today") fillDailyBlank([g.open], gameDate(), `오늘(${md(gameDate())})까지`);
         if (e.target.id === "banner-edit") openInfo(g.open);
     });
 
