@@ -3,7 +3,7 @@ import { db } from "./store.js";
 
 // 허브 Firebase의 모든 기록을 JSON 파일 하나로 내려받음 (문서 수만큼 읽기 한도를 쓰므로 가끔만)
 // gacha_records는 예전 가챠 트래커 원본이라 허브 기록(gacha_banners)과 따로 넣어 둠
-const COLLECTIONS = ["roster", "gacha_banners", "gacha_records", "raids", "intercept", "nikke_notes", "union_info", "union_raids", "union_members", "unions"];
+const COLLECTIONS = ["roster", "gacha_banners", "gacha_records", "raids", "intercept", "nikke_notes", "union_info", "union_raids", "union_members", "unions", "achievements"];
 
 export async function downloadBackup(onProgress = () => {}) {
     const out = { app: "nikke-hub", saved_at: new Date().toISOString(), collections: {} };

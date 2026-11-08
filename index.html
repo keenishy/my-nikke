@@ -240,6 +240,20 @@
         <div class="row end"><span class="muted" id="ic-status"></span><button class="btn primary" id="ic-save">저장</button></div>
     </dialog>
 
+    <dialog id="ach-dialog">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="ach-title">새 업적</h2>
+        <form id="ach-form" class="form">
+            <label>업적 이름<input name="name" placeholder="예: 챔피언 아레나 한 시즌에 응원 모두 성공" autocomplete="off" required></label>
+            <label>목표 횟수 <small class="muted">(1이면 달성/미달성만)</small><input name="target" type="number" min="1" value="1"></label>
+            <label>메모<input name="note" class="memo" placeholder="조건, 보상 등 (선택)" autocomplete="off"></label>
+            <div class="row end">
+                <button type="button" class="btn danger" id="ach-delete" hidden>업적 삭제</button>
+                <button type="submit" class="btn primary">저장</button>
+            </div>
+        </form>
+    </dialog>
+
     <dialog id="settings">
         <button class="close" data-close aria-label="닫기">✕</button>
         <h2>블라블라 연동 설정</h2>

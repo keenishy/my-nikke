@@ -499,3 +499,20 @@ p.center { text-align: center; }
 .clear-wrap > .memo-clear { top: 50%; right: 5px; }
 .clear-wrap.ta > .memo-clear { top: 8px; transform: none; }
 .ic-acc-foot .clear-wrap { flex: 1; }
+
+/* 홈 업적 */
+.ach-card { grid-column: 1 / -1; }
+#ach-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 8px; }
+.ach { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+.ach.all { opacity: 0.6; }
+.ach-head { display: flex; align-items: center; gap: 8px; }
+.ach-head b { flex: 1; min-width: 0; font-size: 0.92rem; }
+.ach-edit { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; padding: 2px 4px; }
+.ach-edit:hover { color: var(--text); }
+.ach-note { font-size: 0.78rem; margin-top: 2px; }
+.ach-accs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.ach-acc { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; cursor: pointer; }
+.ach-acc.part { color: var(--warn); border-color: var(--warn); }
+.ach-acc.ok { background: var(--max); border-color: var(--max); color: #0f1117; font-weight: 700; }
+.ach-acc small { font-size: 0.7rem; }
+@media (max-width: 640px) { #ach-list { grid-template-columns: 1fr; } }

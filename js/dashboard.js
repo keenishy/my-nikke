@@ -6,6 +6,7 @@ import { loadBanners, accountSummary, isActiveDaily } from "./gacha-data.js";
 import { openTodayEntry } from "./intercept.js";
 import { checkWorker, getAccessKey } from "./sync.js";
 import { downloadBackup, readBackup, restoreBackup } from "./backup.js";
+import { achievementsCardHtml, wireAchievements } from "./achievements.js";
 
 // 홈: 각 탭의 데이터를 읽기만 해서 오늘 할 일과 최근 결과를 요약
 const $ = (s, el = document) => el.querySelector(s);
@@ -124,7 +125,8 @@ export async function renderDashboard() {
     const view = $("#dash-view");
     view.innerHTML = `<p class="empty">불러오는 중…</p>`;
     const rosters = JSON.parse(localStorage.getItem("hub_roster") || "{}");
-    const [days, raids, banners, meta, warning] = await Promise.all([loadDays(), loadRaids(), loadBanners(), loadNikkeList(), cookieWarning()]);
+    const [days, raids, banners, meta, warning, achCard] = await Promise.all([loadDays(), loadRaids(), loadBanners(), loadNikkeList(), cookieWarning(), achievementsCardHtml()]);
+    wireAchievements();
     view.innerHTML = `${warning}<div class="dash-links"><a class="btn" href="https://game.naver.com/lounge/nikke/board/48" target="_blank" rel="noopener">공식 공지·점검 일정 (네이버 라운지)</a>
         <span class="spacer"></span><span class="muted" id="backup-status"></span><button class="btn" id="backup-btn" title="모든 기록을 JSON 파일 하나로 내려받습니다">백업 다운로드</button>
         <label class="btn" title="백업 파일로 기록을 되돌립니다">백업 복원<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
@@ -136,6 +138,7 @@ export async function renderDashboard() {
         ${raidCard(raids, "coop", "최근 협동 작전")}
         ${gachaCard(banners, meta)}
         ${accountCard(rosters, meta)}
+        ${achCard}
     </div>`;
     $("#backup-btn").addEventListener("click", async (e) => {
         const btn = e.currentTarget, status = $("#backup-status");
