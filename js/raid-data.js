@@ -4,7 +4,8 @@ import { db } from "./store.js";
 
 // 레이드 문서 (raids/{id}):
 // { kind: "solo"|"coop", season: 숫자|null, boss, bossEn, element, start: "YYYY-MM-DD", end, deck, note, legacy, edited,
-//   results: { 계정: { runs: [{ score: 숫자, pct: 숫자|null, deck: [name_code ×5] }], memo } } }
+//   results: { 계정: { runs: [{ score: 숫자, pct: 숫자|null, deck: [name_code ×5] }], memo, pctFinal: true|false|없음 } } }
+// pctFinal: 상위 %가 시즌 정산 뒤 확정된 값인지. 없으면 종료일이 지난 레이드는 확정으로 봄 (예전 기록)
 
 export const KIND = { solo: "솔로 레이드", coop: "협동 작전" };
 
@@ -38,7 +39,10 @@ export function soloReward(pct) {
     return { dia, frame };
 }
 
-export const fmtScore = (n) => (!n ? "-" : n >= 1e8 ? `${(n / 1e8).toFixed(1)}억` : n.toLocaleString());
+export const fmtScore = (n) => (!n ? "-" : n.toLocaleString());
+
+const todayKst = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+export const isPctFinal = (raid, res) => (res?.pctFinal != null ? !!res.pctFinal : !!raid?.end && raid.end < todayKst());
 export const parseScore = (s) => Number(String(s ?? "").replace(/[^0-9]/g, "")) || 0;
 export const parsePct = (s) => { const v = parseFloat(String(s ?? "").replace(/[^0-9.]/g, "")); return Number.isFinite(v) ? v : null; };
 

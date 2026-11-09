@@ -1,6 +1,6 @@
 import { ACCOUNTS } from "./config.js";
 import { ELEMENT, ELEMENT_ICON, loadNikkeList, portraitUrl, loadSoloRaidBosses } from "./meta.js";
-import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids, soloReward } from "./raid-data.js";
+import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids, soloReward, isPctFinal } from "./raid-data.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -26,10 +26,11 @@ function sorted(kind) {
 }
 
 const elIcon = (el) => (el ? `<img class="el" src="img/${ELEMENT_ICON[el]}.png" alt="${ELEMENT[el]}" title="${ELEMENT[el]}">` : "");
-function pctBadge(p) {
+// 확정 전(시즌 진행 중) %는 점선 테두리 + "잠정"
+function pctBadge(p, final = true) {
     if (p == null) return "";
     const cls = p <= 1 ? "top1" : p <= 3 ? "top3" : p <= 5 ? "top5" : "rest";
-    return `<span class="pct ${cls}">상위 ${p}%</span>`;
+    return `<span class="pct ${cls}${final ? "" : " tentative"}" title="${final ? "확정" : "잠정 (정산 전 기록)"}">상위 ${p}%${final ? "" : " <i>잠정</i>"}</span>`;
 }
 const dateRange = (x) => (x.start ? `${x.start.slice(2).replace(/-/g, ".")}${x.end ? ` ~ ${x.end.slice(5).replace(/-/g, ".")}` : ""}` : x.dateText || "날짜 없음");
 const title = (x) => (x.kind === "solo" && x.season != null ? `S${x.season} ` : "") + (x.boss || "보스 미입력");
@@ -58,7 +59,7 @@ function renderList() {
                 const res = x.results?.[a];
                 const b = best(res);
                 if (!b) return `<td class="dim">-${res?.memo ? `<div class="rmemo" title="${esc(res.memo)}">메모</div>` : ""}</td>`;
-                return `<td><b>${fmtScore(b.score)}</b>${b.runs > 1 ? `<small class="muted"> ·${b.runs}회</small>` : ""}<div>${pctBadge(b.pct)}</div>${b.deck.length ? `<div class="dks">${deckThumbs(b.deck, "tiny")}</div>` : ""}${res.memo ? `<div class="rmemo" title="${esc(res.memo)}">${esc(res.memo)}</div>` : ""}</td>`;
+                return `<td><b>${fmtScore(b.score)}</b>${b.runs > 1 ? `<small class="muted"> ·${b.runs}회</small>` : ""}<div>${pctBadge(b.pct, isPctFinal(x, res))}</div>${b.deck.length ? `<div class="dks">${deckThumbs(b.deck, "tiny")}</div>` : ""}${res.memo ? `<div class="rmemo" title="${esc(res.memo)}">${esc(res.memo)}</div>` : ""}</td>`;
             }).join("")}
             <td class="rdate">${x.start || x.dateText ? esc(dateRange(x)) : `<span class="dim">-</span>`}</td>
             <td class="rnote-col">${x.deck ? `<div><b>${esc(x.deck)}</b></div>` : ""}${x.note ? `<div class="rnote-full" title="${esc(x.note)}">${esc(x.note)}</div>` : ""}</td>
@@ -279,7 +280,9 @@ function openEdit(raid) {
     $("#raid-accounts").innerHTML = ACCOUNTS.map((a) => {
         const res = raid?.results?.[a];
         const runs = res?.runs?.length ? res.runs : [{}];
-        return `<div class="racc" data-acc="${esc(a)}"><div class="racc-head"><b>${esc(a)}</b><button type="button" class="btn small" data-addrun>+ 회차</button></div>
+        return `<div class="racc" data-acc="${esc(a)}"><div class="racc-head"><b>${esc(a)}</b>
+            <label class="pct-final" title="시즌 정산 뒤 최종 순위로 확정된 %면 체크"><input type="checkbox" class="pfinal" ${isPctFinal(raid, res) ? "checked" : ""}>% 확정</label>
+            <button type="button" class="btn small" data-addrun>+ 회차</button></div>
             <div class="runs">${runs.map(runRow).join("")}</div>
             <input class="memo" placeholder="${esc(a)} 메모" value="${esc(res?.memo || "")}"></div>`;
     }).join("");
@@ -319,7 +322,7 @@ async function submitRaid(e) {
         const runs = [...el.querySelectorAll(".run")].map((row) => ({ score: parseScore(row.querySelector(".score").value), pct: parsePct(row.querySelector(".pctin").value), deck: readDeck(row) }))
             .filter((x) => x.score || x.pct != null || x.deck.length);
         const memo = el.querySelector(".memo").value.trim();
-        if (runs.length || memo) results[el.dataset.acc] = { runs, memo };
+        if (runs.length || memo) results[el.dataset.acc] = { runs, memo, pctFinal: el.querySelector(".pfinal").checked };
     });
     const season = parseInt(f.season.value);
     const raid = {

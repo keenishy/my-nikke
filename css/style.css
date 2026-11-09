@@ -230,6 +230,9 @@ dialog.wide { width: min(1200px, calc(100vw - 24px)); }
 .pct.top3 { background: var(--max-soft); color: var(--max); }
 .pct.top5 { background: var(--core-soft); color: var(--core); }
 .pct.rest { background: var(--star-soft); color: var(--star); }
+.pct.tentative { background: transparent; outline: 1px dashed currentColor; outline-offset: -1px; }
+.pct.tentative i { font-style: normal; font-weight: 600; font-size: 0.65rem; opacity: 0.8; }
+.racc-head .pct-final { margin-left: auto; margin-right: 6px; display: flex; align-items: center; gap: 3px; font-size: 0.78rem; color: var(--muted); cursor: pointer; }
 .chart-box { position: relative; height: 320px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 
 #raid-dialog h2 { font-size: 1.1rem; margin: 0 0 12px; }

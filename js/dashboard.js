@@ -1,7 +1,7 @@
 import { ACCOUNTS } from "./config.js";
 import { loadNikkeList, portraitUrl } from "./meta.js";
 import { loadDays, gameDate, runCountFor, expectedOf, actualOf, excludedFromDist } from "./intercept-data.js";
-import { loadRaids, best, fmtScore } from "./raid-data.js";
+import { loadRaids, best, fmtScore, isPctFinal } from "./raid-data.js";
 import { loadBanners, accountSummary, isActiveDaily } from "./gacha-data.js";
 import { openTodayEntry } from "./intercept.js";
 import { checkWorker, getAccessKey, fetchDaily, COOKIE_CHECK_KEY, rememberCookieCheck } from "./sync.js";
@@ -11,7 +11,7 @@ import { achievementsCardHtml, wireAchievements } from "./achievements.js";
 // 홈: 각 탭의 데이터를 읽기만 해서 오늘 할 일과 최근 결과를 요약
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const pctBadge = (p) => (p == null ? "" : `<span class="pct ${p <= 1 ? "top1" : p <= 3 ? "top3" : p <= 5 ? "top5" : "rest"}">${p}%</span>`);
+const pctBadge = (p, final = true) => (p == null ? "" : `<span class="pct ${p <= 1 ? "top1" : p <= 3 ? "top3" : p <= 5 ? "top5" : "rest"}${final ? "" : " tentative"}" title="${final ? "확정" : "잠정"}">${p}%${final ? "" : " <i>잠정</i>"}</span>`);
 const card = (title, body, action = "") => `<section class="dash-card"><div class="dash-head"><h3>${title}</h3>${action}</div>${body}</section>`;
 
 function interceptCard(days, rosters) {
@@ -51,7 +51,7 @@ function raidCard(raids, kind, title) {
     const name = `${kind === "solo" && latest.season != null ? `S${latest.season} ` : ""}${latest.boss}`;
     const rows = ACCOUNTS.map((a) => {
         const b = best(latest.results?.[a]);
-        return `<tr><td>${esc(a)}</td><td>${b ? `<b>${fmtScore(b.score)}</b>` : `<span class="muted">-</span>`}</td><td>${b ? pctBadge(b.pct) : ""}</td></tr>`;
+        return `<tr><td>${esc(a)}</td><td>${b ? `<b>${fmtScore(b.score)}</b>` : `<span class="muted">-</span>`}</td><td>${b ? pctBadge(b.pct, isPctFinal(latest, latest.results?.[a])) : ""}</td></tr>`;
     }).join("");
     return card(`${title} <small class="muted">${esc(name)}</small>`, `<table class="dash-table"><tbody>${rows}</tbody></table>`);
 }
