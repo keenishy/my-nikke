@@ -536,3 +536,18 @@ p.center { text-align: center; }
 .box-bar.mid > div { background: var(--warn); }
 .box-bar.full > div { background: var(--danger); }
 .small-note { font-size: 0.75rem; margin: 6px 0 0; }
+
+/* 솔레·협작 목록: 글자 약 3pt(4px)씩 크게, 약점 아이콘 크게 */
+.raid-table th, .raid-table td { font-size: 1.1rem; padding: 9px 9px; }
+.raid-table .rs { width: 62px; min-width: 62px; max-width: 62px; }
+.raid-table.has-season .rb { left: 62px; }
+.raid-table .rb { min-width: 130px; max-width: 190px; }
+.raid-table .rel .el { width: 30px; height: 30px; }
+.raid-table .rel .muted { font-size: 0.95rem; }
+.raid-table .rnote-full { font-size: 1.02rem; }
+.raid-table td .rmemo { font-size: 0.96rem; max-width: 150px; }
+.raid-table .pct { font-size: 0.96rem; padding: 1px 7px; }
+.raid-table .pct.tentative i { font-size: 0.88rem; }
+.raid-table td small { font-size: 0.9rem; }
+.raid-table .dk.tiny { width: 24px; height: 24px; }
+.raid-table .rdate { min-width: 80px; }
