@@ -117,7 +117,7 @@ function renderList() {
                 const slots = b.results?.[a];
                 if (!slots || !Object.keys(slots).length) return `<span class="bchip none" title="${esc(a)}">${esc(a)} -</span>`;
                 const s = accountSummary(slots, b.daily);
-                return `<span class="bchip ${s.pickup ? "hit" : "miss"}" title="${esc(a)}: ${s.pulls}${b.daily ? "회" : "연"} · 픽업 ${s.pickup}">${esc(a)} <b>${s.pulls}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
+                return `<span class="bchip ${s.pickup ? "hit" : "miss"}" title="${esc(a)}: ${s.pulls}${b.daily ? "회" : "연"} · 픽업 ${s.pickup}">${esc(a)} <b>${s.pulls || (s.gold ? "골티" : 0)}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
             }).join("")}</div>
         </div>`;
     }).join("")}</div>` : `<p class="empty">배너가 없습니다. 「+ 새 배너」로 추가하거나 「기존 기록 가져오기」를 눌러 주세요.</p>`);
@@ -179,7 +179,8 @@ function renderBanner() {
             }).join("")}</tr>`).join("")}</tbody>
             <tfoot><tr><td class="sticky">합계</td>${ACCOUNTS.map((a) => {
                 const s = sums[a];
-                return `<td>${s.pulls ? `<b>${s.pulls}${unit}</b><div>픽업 ${s.pickup}${s.spook ? ` · 픽뚫 ${s.spook}` : ""}${s.pilgrim ? ` · 필그림 ${s.pilgrim}` : ""}${s.gold ? ` · 골티 ${s.gold}` : ""}</div>${s.firstPickup ? `<div class="muted">첫 픽업 ${s.firstPickup}${unit}</div>` : ""}` : "-"}</td>`;
+                return `<td>${s.pulls ? `<b>${s.pulls}${unit}</b><div>픽업 ${s.pickup}${s.spook ? ` · 픽뚫 ${s.spook}` : ""}${s.pilgrim ? ` · 필그림 ${s.pilgrim}` : ""}${s.gold ? ` · 골티 ${s.gold}` : ""}</div>${s.firstPickup ? `<div class="muted">첫 픽업 ${s.firstPickup}${unit}</div>` : ""}`
+                    : s.gold ? `<b>0${unit}</b><div>골티 ${s.gold}장만 사용</div>` : "-"}</td>`;
             }).join("")}</tr></tfoot>
         </table></div>
         ${b.daily ? (rows.length ? `<div class="row center">
@@ -331,7 +332,8 @@ function statRow(label, banners, accounts) {
         const slots = b.results?.[a];
         if (!slots || !Object.keys(slots).length) continue;
         const s = accountSummary(slots, b.daily);
-        t.banners++; t.pulls += s.pulls; t.pickup += s.pickup; t.spook += s.spook; t.pilgrim += s.pilgrim; t.gold += s.gold;
+        if (s.pulls) t.banners++; // 골티만 쓴 배너는 참여 배너 수에서 뺌
+        t.pulls += s.pulls; t.pickup += s.pickup; t.spook += s.spook; t.pilgrim += s.pilgrim; t.gold += s.gold;
     }
     const ssr = t.pickup + t.spook + t.pilgrim;
     const pct = (v) => (t.pulls ? `${((v / t.pulls) * 100).toFixed(2)}%` : "-");

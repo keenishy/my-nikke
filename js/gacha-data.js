@@ -56,13 +56,15 @@ export function dailyDates(b, today) {
 export const isActiveDaily = (b, today) => b.daily && b.start && b.start <= today && (!b.end || today <= b.end);
 
 // 계정별 요약: 총 연차 = 기록된 가장 큰 연차 번호 (기존 트래커와 같은 방식)
+// 골티만 있는 칸(SSR·꽝 표시 없음)은 뽑기 없이 골티(마일리지)만 쓴 것이라 연차에 넣지 않음
 // 매일 무료 1뽑은 기록한 날 수가 곧 뽑은 횟수, 첫 픽업은 몇 번째 뽑기였는지
 export function accountSummary(slots = {}, daily = false) {
     const s = { pulls: 0, pickup: 0, spook: 0, pilgrim: 0, gold: 0, firstPickup: 0 };
     const keys = Object.keys(slots).sort();
     for (const [key, slot] of Object.entries(slots)) {
         const n = daily ? keys.indexOf(key) + 1 : Number(key);
-        s.pulls = Math.max(s.pulls, n);
+        const goldOnly = !slot.b && (slot.d || []).length > 0 && slot.d.every((d) => d.t === "gold");
+        if (!goldOnly) s.pulls = Math.max(s.pulls, n);
         for (const d of slot.d || []) {
             if (d.t === "gold") s.gold += parseInt(d.n) || 1;
             else s[d.t]++;

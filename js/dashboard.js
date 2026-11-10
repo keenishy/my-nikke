@@ -67,7 +67,7 @@ function gachaCard(banners, meta) {
                 const slots = b.results?.[a];
                 if (!slots || !Object.keys(slots).length) return `<span class="bchip none">${esc(a)} -</span>`;
                 const s = accountSummary(slots, b.daily);
-                return `<span class="bchip ${s.pickup ? "hit" : "miss"}">${esc(a)} <b>${s.pulls}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
+                return `<span class="bchip ${s.pickup ? "hit" : "miss"}">${esc(a)} <b>${s.pulls || (s.gold ? "골티" : 0)}</b>${s.pickup ? `<i>★${s.pickup}</i>` : ""}</span>`;
             }).join("")}</div></div></div>`;
     }).join("") || `<p class="muted">배너가 없습니다.</p>`;
     return card("최근 가챠", body);
