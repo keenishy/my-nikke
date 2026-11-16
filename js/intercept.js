@@ -225,7 +225,7 @@ const modButtons = (cls, v) => `<div class="mods-pick ${cls}">${[0, 1, 2, 3].map
 
 function runHtml(r, i) {
     return `<div class="ic-run" data-i="${i}">
-        <div class="ic-run-head"><span>${i + 1}회차</span><select class="stage">${opt([9, 8, 7, 6], r.stage)}</select><label><input type="checkbox" class="rskip" ${r.skip ? "checked" : ""}>스킵</label></div>
+        <div class="ic-run-head"><span>${i + 1}회</span><select class="stage">${opt([9, 8, 7, 6], r.stage)}</select><label><input type="checkbox" class="rskip" ${r.skip ? "checked" : ""}>스킵</label></div>
         ${modButtons("mod", r.mod)}${gearSelect("gear", r.c, r.r)}
         <div class="fb-only">${modButtons("fmod", r.fmod)}${gearSelect("fgear", r.fc, r.fr)}</div>
     </div>`;
@@ -240,7 +240,7 @@ function accCard(a, x, existing) {
         </div>
         <div class="ic-runs">${x.runs.map(runHtml).join("")}</div>
         <div class="ic-acc-foot"><input class="memo" placeholder="메모" value="${esc(x.memo)}">
-            <button type="button" class="btn small" data-runs="-1" title="회차 빼기">− 회차</button><button type="button" class="btn small" data-runs="1" title="회차 추가">+ 회차</button></div>
+            <span class="ic-run-btns"><button type="button" class="btn small" data-runs="-1" title="회차 빼기">− 회차</button><button type="button" class="btn small" data-runs="1" title="회차 추가">+ 회차</button></span></div>
     </div>`;
 }
 

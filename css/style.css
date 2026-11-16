@@ -571,3 +571,24 @@ p.center { text-align: center; }
 .raid-table td small { font-size: 0.9rem; }
 .raid-table .dk.tiny { width: 24px; height: 24px; }
 .raid-table .rdate { min-width: 64px; font-size: 0.92rem; }
+
+/* 특특요 입력 창: 계정마다 한 줄 (계정·보스 | 1~5회차 | 메모), 회차 칸은 모든 계정이 같은 폭이라 세로로 줄이 맞음 */
+#ic-dialog { width: min(1440px, calc(100vw - 24px)); }
+.ic-accounts { display: flex; flex-direction: column; gap: 6px; max-height: 70vh; }
+.ic-acc { display: grid; grid-template-columns: 128px minmax(0, 1fr) 150px; align-items: start; gap: 8px; padding: 8px; }
+.ic-acc-head { flex-direction: column; align-items: stretch; gap: 6px; }
+.ic-acc-head b { margin-right: 0; font-size: 1rem; }
+.ic-acc-head select { width: 100%; }
+.ic-runs { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+.ic-run-head { gap: 3px; white-space: nowrap; }
+.ic-run-head span { font-weight: 700; color: var(--text); }
+.ic-run-head select { padding: 2px 4px !important; font-size: 0.75rem; }
+.ic-run-head label { white-space: nowrap; }
+.ic-acc-foot { flex-direction: column; align-items: stretch; gap: 6px; }
+.ic-acc-foot .clear-wrap, .ic-acc-foot .memo { width: 100%; }
+.ic-run-btns { display: flex; gap: 4px; }
+.ic-run-btns .btn { flex: 1; }
+@media (max-width: 900px) {
+    .ic-acc { grid-template-columns: 1fr; }
+    .ic-runs { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important; }
+}
