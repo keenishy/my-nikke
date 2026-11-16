@@ -51,7 +51,7 @@ function raidCard(raids, kind, title) {
     const name = `${kind === "solo" && latest.season != null ? `S${latest.season} ` : ""}${latest.boss}`;
     const rows = ACCOUNTS.map((a) => {
         const b = best(latest.results?.[a]);
-        return `<tr><td>${esc(a)}</td><td>${b ? `<b>${fmtScore(b.score)}</b>` : `<span class="muted">-</span>`}</td><td>${b ? pctBadge(b.pct, isPctFinal(latest, latest.results?.[a])) : ""}</td></tr>`;
+        return `<tr><td>${esc(a)}</td><td>${b ? `<b>${fmtScore(b.score)}</b>` : `<span class="muted">-</span>`}</td><td>${b ? pctBadge(b.pct, isPctFinal(latest, latest.results?.[a], raids)) : ""}</td></tr>`;
     }).join("");
     return card(`${title} <small class="muted">${esc(name)}</small>`, `<table class="dash-table"><tbody>${rows}</tbody></table>`);
 }

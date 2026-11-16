@@ -4,8 +4,9 @@ import { db } from "./store.js";
 
 // 레이드 문서 (raids/{id}):
 // { kind: "solo"|"coop", season: 숫자|null, boss, bossEn, element, start: "YYYY-MM-DD", end, deck, note, legacy, edited,
-//   results: { 계정: { runs: [{ score: 숫자, pct: 숫자|null, deck: [name_code ×5] }], memo, pctFinal: true|false|없음 } } }
-// pctFinal: 상위 %가 시즌 정산 뒤 확정된 값인지. 없으면 종료일이 지난 레이드는 확정으로 봄 (예전 기록)
+//   results: { 계정: { runs: [{ score: 숫자, pct: 숫자|null, deck: [name_code ×5], decks: ["code,code,…" ×5] }], memo, pctFinal: true|false|없음 } } }
+// deck = 첫 번째 덱(협동 작전은 이것만), decks = 솔로 레이드 덱 5개 (Firestore는 배열 안의 배열을 못 넣어서 덱마다 쉼표 문자열)
+// pctFinal: 상위 %가 시즌 정산 뒤 확정된 값인지 (시즌이 끝난 레이드는 체크와 상관없이 확정으로 봄)
 
 export const KIND = { solo: "솔로 레이드", coop: "협동 작전" };
 
@@ -27,7 +28,7 @@ export function best(result) {
     if (!runs.length) return null;
     const top = runs.reduce((m, r) => ((r.score || 0) > (m.score || 0) ? r : m), runs[0]);
     const pcts = runs.map((r) => r.pct).filter((p) => p != null);
-    return { score: top.score || 0, pct: pcts.length ? Math.min(...pcts) : null, runs: runs.length, deck: top.deck || [] };
+    return { score: top.score || 0, pct: pcts.length ? Math.min(...pcts) : null, runs: runs.length, deck: top.deck || [], decks: decksOf(top) };
 }
 
 // 솔로 레이드 시즌 종료 보상 (상위 % 구간 → 다이아·테두리 단계). 1~200위 보상은 순위 숫자가 없어 0.5% 구간으로 계산
@@ -42,7 +43,22 @@ export function soloReward(pct) {
 export const fmtScore = (n) => (!n ? "-" : n.toLocaleString());
 
 const todayKst = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-export const isPctFinal = (raid, res) => (res?.pctFinal != null ? !!res.pctFinal : !!raid?.end && raid.end < todayKst());
+export const decksOf = (run = {}) => (run.decks?.length ? run.decks.map((s) => (s ? String(s).split(",").map(Number).filter(Boolean) : [])) : [run.deck || []]);
+
+// 시즌이 끝났는지: 종료일이 지났거나, 종료일이 없으면 시작일 7일 뒤가 지났거나, 같은 종류의 더 최근 레이드가 있으면 끝난 것
+export function raidEnded(raid, all = []) {
+    const today = todayKst();
+    if (raid?.end) return raid.end < today;
+    if (raid?.start) {
+        const d = new Date(`${raid.start}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + 7);
+        if (d.toISOString().slice(0, 10) < today) return true;
+    }
+    if (all.some((o) => o !== raid && o.kind === raid?.kind && ((o.start && raid.start && o.start > raid.start) || (o.season != null && raid.season != null && o.season > raid.season)))) return true;
+    return !raid?.start && !raid?.end; // 날짜가 하나도 없는 예전 기록
+}
+// 확정: 시즌이 끝났거나 「% 확정」을 체크한 경우. 진행 중이고 체크 안 했으면 잠정
+export const isPctFinal = (raid, res, all = []) => !!res?.pctFinal || raidEnded(raid, all);
 export const parseScore = (s) => Number(String(s ?? "").replace(/[^0-9]/g, "")) || 0;
 export const parsePct = (s) => { const v = parseFloat(String(s ?? "").replace(/[^0-9.]/g, "")); return Number.isFinite(v) ? v : null; };
 

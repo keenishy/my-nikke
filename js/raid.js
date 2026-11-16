@@ -1,6 +1,6 @@
 import { ACCOUNTS } from "./config.js";
 import { ELEMENT, ELEMENT_ICON, loadNikkeList, portraitUrl, loadSoloRaidBosses } from "./meta.js";
-import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids, soloReward, isPctFinal } from "./raid-data.js";
+import { KIND, loadRaids, saveRaid, deleteRaid, newRaidId, best, fmtScore, parseScore, parsePct, buildLegacyRaids, importLegacyRaids, soloReward, isPctFinal, decksOf, raidEnded } from "./raid-data.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -59,7 +59,7 @@ function renderList() {
                 const res = x.results?.[a];
                 const b = best(res);
                 if (!b) return `<td class="dim">-${res?.memo ? `<div class="rmemo" title="${esc(res.memo)}">메모</div>` : ""}</td>`;
-                return `<td><b>${fmtScore(b.score)}</b>${b.runs > 1 ? `<small class="muted"> ·${b.runs}회</small>` : ""}<div>${pctBadge(b.pct, isPctFinal(x, res))}</div>${b.deck.length ? `<div class="dks">${deckThumbs(b.deck, "tiny")}</div>` : ""}${res.memo ? `<div class="rmemo" title="${esc(res.memo)}">${esc(res.memo)}</div>` : ""}</td>`;
+                return `<td><b>${fmtScore(b.score)}</b>${b.runs > 1 ? `<small class="muted"> ·${b.runs}회</small>` : ""}<div>${pctBadge(b.pct, isPctFinal(x, res, r.raids))}</div>${b.deck.length ? `<div class="dks" title="${b.decks.filter((d) => d.length).length}개 덱">${deckThumbs(b.deck, "tiny")}${b.decks.filter((d) => d.length).length > 1 ? `<small class="muted">+${b.decks.filter((d) => d.length).length - 1}</small>` : ""}</div>` : ""}${res.memo ? `<div class="rmemo" title="${esc(res.memo)}">${esc(res.memo)}</div>` : ""}</td>`;
             }).join("")}
             <td class="rdate">${x.start || x.dateText ? esc(dateRange(x)) : `<span class="dim">-</span>`}</td>
             <td class="rnote-col">${x.deck ? `<div><b>${esc(x.deck)}</b></div>` : ""}${x.note ? `<div class="rnote-full" title="${esc(x.note)}">${esc(x.note)}</div>` : ""}</td>
@@ -187,18 +187,24 @@ function deckThumbs(deck = [], size = "") {
     return deck.map((c) => r.meta?.get(c)).filter(Boolean)
         .map((m) => `<img class="dk ${size}" src="${portraitUrl(m.resource)}" alt="${esc(m.name)}" title="${esc(m.name)}">`).join("");
 }
-const deckButton = (deck) => (deck.length ? `<span class="dks">${deckThumbs(deck)}</span>` : "덱 선택");
+// 덱 버튼: 솔로 레이드는 덱 5개를 줄마다, 협동 작전은 덱 1개
+const deckButton = (decks) => (decks.some((d) => d.length)
+    ? decks.map((d, i) => (d.length ? `<span class="dks dk-line"><small>${decks.length > 1 ? `덱${i + 1}` : ""}</small>${deckThumbs(d, "tiny")}</span>` : "")).join("")
+    : "덱 선택");
+const isSoloForm = () => $("#raid-form").kind.value === "solo";
+const encodeDecks = (decks) => decks.map((d) => d.join(",")).join("|");
+const readDecks = (row) => (row.dataset.decks ? row.dataset.decks.split("|").map((s) => (s ? s.split(",").map(Number) : [])) : [[]]);
 
 // 점수는 숫자만 쳐도 쉼표가 자동으로 붙고, 아래에 "316억 6509만"처럼 읽기 쉬운 값을 같이 보여 줌
 const scoreHint = (n) => (n >= 1e8 ? `${Math.floor(n / 1e8)}억${n % 1e8 >= 1e4 ? ` ${Math.floor((n % 1e8) / 1e4)}만` : ""}` : n >= 1e4 ? `${Math.floor(n / 1e4)}만` : "");
 
 function runRow(run = {}) {
-    const deck = run.deck || [];
-    return `<div class="run" data-deck="${deck.join(",")}">
+    const decks = decksOf(run);
+    return `<div class="run" data-decks="${encodeDecks(decks)}">
         <div class="score-wrap"><input class="score" inputmode="numeric" autocomplete="off" placeholder="점수 (숫자만)" value="${run.score ? run.score.toLocaleString() : ""}"><span class="score-hint">${run.score ? scoreHint(run.score) : ""}</span></div>
         <label class="pct-wrap"><span>상위</span><input class="pctin" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${run.pct ?? ""}"><span>%</span></label>
         <button type="button" class="btn small" data-delrun aria-label="회차 삭제">✕</button>
-        <button type="button" class="deck-btn" data-deckedit>${deckButton(deck)}</button></div>`;
+        <button type="button" class="deck-btn" data-deckedit>${deckButton(decks)}</button></div>`;
 }
 
 // 입력하는 동안 점수에 쉼표를 넣고, 커서는 같은 숫자 뒤에 그대로 둠
@@ -219,13 +225,15 @@ function cleanPctInput(el) {
     if (v !== el.value) el.value = v;
 }
 
-const readDeck = (row) => (row.dataset.deck ? row.dataset.deck.split(",").map(Number) : []);
-
+// 솔로 레이드: 덱 5개, 한 니케는 한 덱에만 (다른 덱에 있던 니케를 누르면 지금 덱으로 옮김)
 function openDeckPicker(row) {
     const acc = row.closest(".racc").dataset.acc;
     const runNo = [...row.parentElement.children].indexOf(row) + 1;
-    r.picker = { row, acc, deck: readDeck(row) };
-    $("#deck-title").textContent = `${acc} · ${runNo}회차 덱`;
+    const n = isSoloForm() ? 5 : 1;
+    const decks = readDecks(row).slice(0, n);
+    while (decks.length < n) decks.push([]);
+    r.picker = { row, acc, decks, active: Math.max(0, decks.findIndex((d) => d.length < 5)) };
+    $("#deck-title").textContent = `${acc} · ${runNo}회차 덱${n > 1 ? " (덱 5개)" : ""}`;
     $("#deck-q").value = "";
     renderDeckPicker();
     $("#deck-dialog").showModal();
@@ -233,33 +241,44 @@ function openDeckPicker(row) {
 }
 
 function renderDeckPicker() {
-    const { acc, deck } = r.picker;
+    const { acc, decks, active } = r.picker;
+    const used = new Map(decks.flatMap((d, i) => d.map((c) => [c, i])));
     const owned = $("#deck-owned").checked ? new Set((JSON.parse(localStorage.getItem("hub_roster") || "{}")[acc]?.nikkes || []).map((n) => n.c)) : null;
     const q = $("#deck-q").value.replace(/\s/g, "");
     const list = [...r.meta.values()]
         .filter((m) => m.rare === "SSR" && (!owned || owned.has(m.code)) && (!q || m.name.replace(/\s/g, "").includes(q)))
         .sort((a, b) => (b.release || "").localeCompare(a.release || "") || b.order - a.order);
-    $("#deck-picked").innerHTML = [0, 1, 2, 3, 4].map((i) => {
-        const m = r.meta.get(deck[i]);
-        return m ? `<button type="button" class="pick on" data-pick="${m.code}"><img src="${portraitUrl(m.resource)}" alt=""><span>${esc(m.name)}</span></button>`
-            : `<div class="pick empty">${i + 1}</div>`;
-    }).join("");
-    $("#deck-grid").innerHTML = list.map((m) => `<button type="button" class="pick ${deck.includes(m.code) ? "on" : ""}" data-pick="${m.code}">
-        <img loading="lazy" src="${portraitUrl(m.resource)}" alt=""><span>${esc(m.name)}</span></button>`).join("") || `<p class="muted">맞는 니케가 없습니다.</p>`;
+    $("#deck-picked").innerHTML = decks.map((deck, di) => `<div class="deck-row ${di === active ? "active" : ""}" data-deckrow="${di}">
+        ${decks.length > 1 ? `<span class="deck-no">덱 ${di + 1}<small>${deck.length}/5</small></span>` : ""}
+        <div class="deck-slots">${[0, 1, 2, 3, 4].map((i) => {
+            const m = r.meta.get(deck[i]);
+            return m ? `<button type="button" class="pick on" data-pick="${m.code}"><img src="${portraitUrl(m.resource)}" alt=""><span>${esc(m.name)}</span></button>`
+                : `<div class="pick empty">${i + 1}</div>`;
+        }).join("")}</div></div>`).join("");
+    $("#deck-grid").innerHTML = list.map((m) => {
+        const at = used.get(m.code);
+        return `<button type="button" class="pick ${at === active ? "on" : at != null ? "other" : ""}" data-pick="${m.code}">
+        <img loading="lazy" src="${portraitUrl(m.resource)}" alt="">${at != null && decks.length > 1 ? `<em>덱${at + 1}</em>` : ""}<span>${esc(m.name)}</span></button>`;
+    }).join("") || `<p class="muted">맞는 니케가 없습니다.</p>`;
 }
 
 function togglePick(code) {
-    const { deck } = r.picker;
-    const i = deck.indexOf(code);
-    if (i >= 0) deck.splice(i, 1);
-    else if (deck.length < 5) deck.push(code);
+    const p = r.picker;
+    const at = p.decks.findIndex((d) => d.includes(code));
+    if (at === p.active) p.decks[at].splice(p.decks[at].indexOf(code), 1);
+    else if (p.decks[p.active].length < 5) {
+        if (at >= 0) p.decks[at].splice(p.decks[at].indexOf(code), 1);
+        p.decks[p.active].push(code);
+        // 지금 덱이 다 차면 빈자리가 있는 다음 덱으로
+        if (p.decks[p.active].length === 5) { const next = p.decks.findIndex((d, i) => i > p.active && d.length < 5); if (next >= 0) p.active = next; }
+    }
     renderDeckPicker();
 }
 
 function applyDeck() {
-    const { row, deck } = r.picker;
-    row.dataset.deck = deck.join(",");
-    row.querySelector("[data-deckedit]").innerHTML = deckButton(deck);
+    const { row, decks } = r.picker;
+    row.dataset.decks = encodeDecks(decks);
+    row.querySelector("[data-deckedit]").innerHTML = deckButton(decks);
     $("#deck-dialog").close();
 }
 
@@ -281,7 +300,7 @@ function openEdit(raid) {
         const res = raid?.results?.[a];
         const runs = res?.runs?.length ? res.runs : [{}];
         return `<div class="racc" data-acc="${esc(a)}"><div class="racc-head"><b>${esc(a)}</b>
-            <label class="pct-final" title="시즌 정산 뒤 최종 순위로 확정된 %면 체크"><input type="checkbox" class="pfinal" ${isPctFinal(raid, res) ? "checked" : ""}>% 확정</label>
+            <label class="pct-final" title="시즌 정산 뒤 최종 순위로 확정된 %면 체크"><input type="checkbox" class="pfinal" ${res?.pctFinal || (raid && raidEnded(raid, r.raids)) ? "checked" : ""}>% 확정</label>
             <button type="button" class="btn small" data-addrun>+ 회차</button></div>
             <div class="runs">${runs.map(runRow).join("")}</div>
             <input class="memo" placeholder="${esc(a)} 메모" value="${esc(res?.memo || "")}"></div>`;
@@ -319,8 +338,12 @@ async function submitRaid(e) {
     const kind = f.kind.value;
     const results = {};
     document.querySelectorAll("#raid-accounts .racc").forEach((el) => {
-        const runs = [...el.querySelectorAll(".run")].map((row) => ({ score: parseScore(row.querySelector(".score").value), pct: parsePct(row.querySelector(".pctin").value), deck: readDeck(row) }))
-            .filter((x) => x.score || x.pct != null || x.deck.length);
+        const runs = [...el.querySelectorAll(".run")].map((row) => {
+            const decks = readDecks(row).slice(0, kind === "solo" ? 5 : 1);
+            const run = { score: parseScore(row.querySelector(".score").value), pct: parsePct(row.querySelector(".pctin").value), deck: decks[0] || [] };
+            if (kind === "solo" && decks.some((d, i) => i > 0 && d.length)) run.decks = decks.map((d) => d.join(","));
+            return run;
+        }).filter((x) => x.score || x.pct != null || x.deck.length || x.decks);
         const memo = el.querySelector(".memo").value.trim();
         if (runs.length || memo) results[el.dataset.acc] = { runs, memo, pctFinal: el.querySelector(".pfinal").checked };
     });
@@ -434,8 +457,13 @@ export async function initRaid() {
     $("#raid-delete").addEventListener("click", removeRaid);
     $("#deck-q").addEventListener("input", renderDeckPicker);
     $("#deck-owned").addEventListener("change", renderDeckPicker);
-    $("#deck-dialog").addEventListener("click", (e) => { const c = e.target.closest("[data-pick]")?.dataset.pick; if (c) togglePick(Number(c)); });
-    $("#deck-clear").addEventListener("click", () => { r.picker.deck = []; renderDeckPicker(); });
+    $("#deck-dialog").addEventListener("click", (e) => {
+        const c = e.target.closest("[data-pick]")?.dataset.pick;
+        if (c) return togglePick(Number(c));
+        const row = e.target.closest("[data-deckrow]")?.dataset.deckrow;
+        if (row != null) { r.picker.active = Number(row); renderDeckPicker(); }
+    });
+    $("#deck-clear").addEventListener("click", () => { r.picker.decks[r.picker.active] = []; renderDeckPicker(); });
     $("#deck-ok").addEventListener("click", applyDeck);
 
     render();
