@@ -122,7 +122,7 @@ dialog .close { position: absolute; right: 14px; top: 12px; border: none; backgr
 }
 
 /* ---------- 가챠 ---------- */
-:root { --pickup: #ffa94d; --pickup-soft: rgba(255, 169, 77, 0.14); --spook: #da77f2; --spook-soft: rgba(218, 119, 242, 0.14); --pilgrim: #4dabf7; --pilgrim-soft: rgba(77, 171, 247, 0.14); --gold: #ffd43b; --gold-soft: rgba(255, 212, 59, 0.12); --danger: #ff6b6b; }
+:root { --fb: #66d9e8; --fb-soft: rgba(102, 217, 232, 0.14); --pickup: #ffa94d; --pickup-soft: rgba(255, 169, 77, 0.14); --spook: #da77f2; --spook-soft: rgba(218, 119, 242, 0.14); --pilgrim: #4dabf7; --pilgrim-soft: rgba(77, 171, 247, 0.14); --gold: #ffd43b; --gold-soft: rgba(255, 212, 59, 0.12); --danger: #ff6b6b; }
 .foot-link { margin-top: 18px; }
 .foot-link a { color: var(--primary); }
 .row.wrap { flex-wrap: wrap; }
@@ -308,8 +308,8 @@ td .dks { margin-top: 4px; }
 .ic-table tbody tr:hover td { background: var(--hover); }
 .ic-table td.dim { color: var(--faint); }
 .mods { letter-spacing: 0.05em; }
-.fmods { color: var(--pickup); font-size: 0.78rem; font-weight: 700; }
-.fbtag { font-size: 0.7rem; font-weight: 700; color: var(--pickup); background: var(--pickup-soft); border-radius: 4px; padding: 1px 5px; }
+.fmods { color: var(--fb); font-size: 0.78rem; font-weight: 700; }
+.fbtag { font-size: 0.7rem; font-weight: 700; color: var(--fb); background: var(--fb-soft); border-radius: 4px; padding: 1px 5px; }
 .gear { display: inline-block; font-size: 0.68rem; font-weight: 700; border-radius: 4px; padding: 0 4px; margin: 2px 1px 0; background: var(--star-soft); color: var(--star); }
 .gear.c-ely { background: rgba(77, 171, 247, 0.18); color: #74c0fc; }
 .gear.c-mis { background: rgba(218, 119, 242, 0.18); color: #e599f7; }
@@ -327,7 +327,7 @@ td .dks { margin-top: 4px; }
 .ic-top input, .ic-top select, .ic-acc select, .ic-acc .memo { border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: var(--bg); color: var(--text); }
 .ic-accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; max-height: 64vh; overflow: auto; }
 .ic-acc { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.ic-acc.is-fb { border-color: var(--pickup); }
+.ic-acc.is-fb { border-color: var(--fb); }
 .ic-acc.skipped .ic-runs { opacity: 0.45; }
 .ic-acc.skipped .ic-runs:hover { opacity: 0.8; }
 .ic-acc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -342,9 +342,9 @@ td .dks { margin-top: 4px; }
 .mods-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
 .mods-pick button { border: 1px solid var(--border); background: var(--bg); color: var(--muted); border-radius: 5px; padding: 3px 0; cursor: pointer; font-weight: 700; }
 .mods-pick button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
-.fb-only { display: none; flex-direction: column; gap: 5px; border-top: 1px dashed var(--pickup); padding-top: 5px; }
+.fb-only { display: none; flex-direction: column; gap: 5px; border-top: 1px dashed var(--fb); padding-top: 5px; }
 .is-fb .fb-only { display: flex; }
-.fb-only .mods-pick button.on { background: var(--pickup); border-color: var(--pickup); color: #111; }
+.fb-only .mods-pick button.on { background: var(--fb); border-color: var(--fb); color: #111; }
 .ic-acc.untouched { opacity: 0.55; }
 .ic-acc.untouched .ic-acc-head b::after { content: " · 미입력"; color: var(--muted); font-weight: 400; font-size: 0.8rem; }
 .month-sum { margin-bottom: 14px; }
@@ -500,14 +500,14 @@ p.center { text-align: center; }
 
 /* 특특요 목록: 위 = 총 개수 + 회차별 숫자(흐리게), 아래 = 획득 장비 */
 .ic-table th { min-width: 104px; }
-.ic-dayfb { flex-direction: row !important; align-items: center; gap: 6px; font-weight: 700; color: var(--pickup) !important; align-self: flex-end; padding-bottom: 6px; }
+.ic-dayfb { flex-direction: row !important; align-items: center; gap: 6px; font-weight: 700; color: var(--fb) !important; align-self: flex-end; padding-bottom: 6px; }
 .ic-table td.ic-cell { padding: 7px 8px; }
 .ic-cell-top { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .ic-total { font-size: 1.3rem; line-height: 1.1; }
 .ic-total.good { color: var(--max); }
 .ic-memo { color: var(--muted); font-size: 0.92rem; cursor: help; }
 .ic-line { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.02em; line-height: 1.3; }
-.ic-line.fmods { color: var(--pickup); font-size: 0.8rem; font-weight: 600; opacity: 0.85; }
+.ic-line.fmods { color: var(--fb); font-size: 0.8rem; font-weight: 600; opacity: 0.9; }
 .ic-lines { display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; }
 .ic-sum { display: inline-flex; flex-direction: column; align-items: center; }
 .ic-luck { font-size: 0.78rem; font-weight: 600; }
@@ -515,7 +515,8 @@ p.center { text-align: center; }
 .ic-gears .gear { margin: 0; font-size: 0.76rem; padding: 0 4px; line-height: 1.5; }
 .ic-table .small-boss { font-size: 0.85rem; }
 .ic-boss-more { color: var(--warn); }
-.ic-boss { display: inline-block; font-size: 0.76rem; font-weight: 700; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+.ic-boss { display: inline-block; font-size: 0.78rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.ic-boss.other { color: var(--text); font-weight: 800; }
 .dash-table td.num { text-align: right; white-space: nowrap; }
 
 /* 메모 칸 ✕ 버튼 (main.js가 자동으로 붙임) */
