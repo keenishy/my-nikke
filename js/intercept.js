@@ -25,8 +25,7 @@ const dayLabel = (date) => `${date.slice(2).replace(/-/g, ".")} (${WEEK[new Date
 // 화면에 보이는 보스 이름 (저장 값은 그대로)
 const BOSS_SHORT = { "미러 컨테이너": "미컨" };
 const bossName = (b) => BOSS_SHORT[b] || b;
-// 칸마다 보스 이름을 붙임. 대부분 크라켄이라 크라켄은 흐리게, 다른 보스는 눈에 띄게
-const DEFAULT_BOSS = "크라켄";
+// 칸마다 보스 이름을 붙임 (모든 보스 같은 주황 태그)
 const gearName = (c, r) => (c ? `${c}${r ? ` ${r}` : ""}` : "");
 const gearBadge = (c, r) => (c ? `<span class="gear ${CORP_CLS[c] || ""}" title="${esc(c)} ${esc(r)}">${esc(c[0])}${esc(r?.[0] || "")}</span>` : "");
 
@@ -74,7 +73,7 @@ function renderList() {
                     const total = actualOf(x), good = total >= expectedOf(x, d.date);
                     const tip = [`일반 ${mods}`, fmods && `풀버 +${fmods}`, gearList.length && `장비 ${gearList.map(([c, r]) => gearName(c, r)).join(", ")}`, x.memo && `메모 ${x.memo}`].filter(Boolean).join("\n");
                     return `<td class="ic-cell" title="${esc(tip)}">
-                        <div class="ic-cell-top">${x.boss ? `<span class="ic-boss${x.boss === DEFAULT_BOSS ? " usual" : ""}">${esc(bossName(x.boss))}</span>` : ""}<b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-lines"><span class="ic-line">${mods}${odd}</span>${fmods ? `<span class="ic-line fmods">+${fmods}</span>` : ""}</span>${memo}</div>
+                        <div class="ic-cell-top">${x.boss ? `<span class="ic-boss">${esc(bossName(x.boss))}</span>` : ""}<b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-lines"><span class="ic-line">${mods}${odd}</span>${fmods ? `<span class="ic-line fmods">+${fmods}</span>` : ""}</span>${memo}</div>
                         ${gearList.length ? `<div class="ic-gears">${gearList.map(([c, r]) => gearBadge(c, r)).join("")}</div>` : ""}</td>`;
                 }).join("")}
             </tr>`;

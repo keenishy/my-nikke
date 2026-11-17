@@ -516,7 +516,6 @@ p.center { text-align: center; }
 .ic-table .small-boss { font-size: 0.85rem; }
 .ic-boss-more { color: var(--warn); }
 .ic-boss { display: inline-block; font-size: 0.76rem; font-weight: 700; color: var(--warn); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; white-space: nowrap; }
-.ic-boss.usual { color: var(--muted); border-color: var(--border); font-weight: 600; }
 .dash-table td.num { text-align: right; white-space: nowrap; }
 
 /* 메모 칸 ✕ 버튼 (main.js가 자동으로 붙임) */
