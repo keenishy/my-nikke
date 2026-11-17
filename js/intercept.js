@@ -22,6 +22,11 @@ const t = {
 const sortedDays = () => t.days.slice().sort((a, b) => b.date.localeCompare(a.date));
 const inPeriod = (d) => !t.month || d.date.startsWith(t.month);
 const dayLabel = (date) => `${date.slice(2).replace(/-/g, ".")} (${WEEK[new Date(`${date}T00:00:00`).getDay()]})`;
+// 화면에 보이는 보스 이름 (저장 값은 그대로)
+const BOSS_SHORT = { "미러 컨테이너": "미컨" };
+const bossName = (b) => BOSS_SHORT[b] || b;
+// 특특요는 대부분 크라켄이라, 크라켄이 아닌 보스를 친 칸에만 보스 이름을 붙임
+const DEFAULT_BOSS = "크라켄";
 const gearName = (c, r) => (c ? `${c}${r ? ` ${r}` : ""}` : "");
 const gearBadge = (c, r) => (c ? `<span class="gear ${CORP_CLS[c] || ""}" title="${esc(c)} ${esc(r)}">${esc(c[0])}${esc(r?.[0] || "")}</span>` : "");
 
@@ -54,13 +59,8 @@ function renderList() {
         <tbody>${monthRow(list)}${list.map((d) => {
             const res = Object.values(d.results || {});
             const anyFb = res.some((x) => x.fb);
-            // 날짜 칸에는 그날 가장 많이 친 보스만, 다른 보스를 친 계정은 그 칸에 보스 이름을 표시
-            const count = {};
-            for (const x of res) if (!x.skip) count[x.boss] = (count[x.boss] || 0) + 1;
-            const main = Object.entries(count).sort((p, q) => q[1] - p[1])[0]?.[0] || res[0]?.boss || "";
-            const others = Object.keys(count).length - 1;
             return `<tr data-date="${d.date}">
-                <td class="sticky"><b>${dayLabel(d.date)}</b>${anyFb ? ` <span class="fbtag">풀버</span>` : ""}<div class="muted small-boss">${esc(main)}${others > 0 ? ` <span class="ic-boss-more">외 ${others}</span>` : ""}</div></td>
+                <td class="sticky"><b>${dayLabel(d.date)}</b>${anyFb ? ` <span class="fbtag">풀버</span>` : ""}</td>
                 ${ACCOUNTS.map((a) => {
                     const x = d.results?.[a];
                     if (!x) return `<td class="dim">-</td>`;
@@ -74,7 +74,7 @@ function renderList() {
                     const total = actualOf(x), good = total >= expectedOf(x, d.date);
                     const tip = [`일반 ${mods}`, fmods && `풀버 +${fmods}`, gearList.length && `장비 ${gearList.map(([c, r]) => gearName(c, r)).join(", ")}`, x.memo && `메모 ${x.memo}`].filter(Boolean).join("\n");
                     return `<td class="ic-cell" title="${esc(tip)}">
-                        ${x.boss !== main ? `<div class="ic-boss">${esc(x.boss)}</div>` : ""}<div class="ic-cell-top"><b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-lines"><span class="ic-line">${mods}${odd}</span>${fmods ? `<span class="ic-line fmods">+${fmods}</span>` : ""}</span>${memo}</div>
+                        <div class="ic-cell-top">${x.boss && x.boss !== DEFAULT_BOSS ? `<span class="ic-boss">${esc(bossName(x.boss))}</span>` : ""}<b class="ic-total ${good ? "good" : ""}">${total}</b><span class="ic-lines"><span class="ic-line">${mods}${odd}</span>${fmods ? `<span class="ic-line fmods">+${fmods}</span>` : ""}</span>${memo}</div>
                         ${gearList.length ? `<div class="ic-gears">${gearList.map(([c, r]) => gearBadge(c, r)).join("")}</div>` : ""}</td>`;
                 }).join("")}
             </tr>`;
@@ -131,7 +131,7 @@ function renderStats() {
             ${accs.length > 1 ? luckRow("전체", pairs) : ""}
         </tbody></table></div>
         <h3 class="sec">보스별 운빨</h3>
-        <div class="table-wrap"><table class="stats">${head}<tbody>${bosses.map((b) => luckRow(b, pairs.filter((p) => p.x.boss === b))).join("")}</tbody></table></div>
+        <div class="table-wrap"><table class="stats">${head}<tbody>${bosses.map((b) => luckRow(bossName(b), pairs.filter((p) => p.x.boss === b))).join("")}</tbody></table></div>
         <h3 class="sec">9단계 일반 모듈 개수 분포 <small class="muted">(실제 vs 공식, 7/23 패치 전후 비율로 섞음)</small></h3>
         <div class="chart-box"><canvas id="ic-chart"></canvas></div>
         <div id="ic-dist-table"></div>
@@ -235,7 +235,7 @@ function runHtml(r, i) {
 function accCard(a, x, existing) {
     return `<div class="ic-acc ${x.skip ? "skipped" : ""} ${x.fb ? "is-fb" : ""} ${existing ? "" : "untouched"}" data-acc="${esc(a)}" ${existing ? 'data-keep="1"' : ""}>
         <div class="ic-acc-head"><b>${esc(a)}</b>
-            <select class="boss">${opt(BOSSES, x.boss)}</select>
+            <select class="boss">${BOSSES.map((b) => `<option value="${esc(b)}" ${b === x.boss ? "selected" : ""}>${esc(bossName(b))}</option>`).join("")}</select>
             <label><input type="checkbox" class="skip" ${x.skip ? "checked" : ""}>미참여</label>
         </div>
         <div class="ic-runs">${x.runs.map(runHtml).join("")}</div>
@@ -267,7 +267,7 @@ function openDay(date) {
     t.editing = { date, results, isNew: !day };
     $("#ic-date").value = date;
     $("#ic-dialog-title").textContent = day ? `${dayLabel(date)} 기록 수정` : `${dayLabel(date)} 새 기록`;
-    $("#ic-all-boss").innerHTML = `<option value="">계정별 그대로</option>` + BOSSES.map((b) => `<option>${b}</option>`).join("");
+    $("#ic-all-boss").innerHTML = `<option value="">계정별 그대로</option>` + BOSSES.map((b) => `<option value="${esc(b)}">${esc(bossName(b))}</option>`).join("");
     $("#ic-accounts").innerHTML = ACCOUNTS.map((a) => accCard(a, results[a], !!day?.results?.[a])).join("");
     setDayFb(!!day && Object.values(day.results || {}).some((x) => x.fb));
     $("#ic-status").textContent = "";
