@@ -593,3 +593,14 @@ p.center { text-align: center; }
     .ic-acc { grid-template-columns: 1fr; }
     .ic-runs { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important; }
 }
+
+/* 글자 키우기 (약 +2px): 홈·가챠·특특요 화면과 가챠·특특요·레이드 입력 창을 통째로 13% 확대.
+   창은 확대된 뒤에도 화면 안에 들어오도록 폭·높이를 배율로 나눠 둠 */
+:root { --z: 1.13; }
+#tab-dashboard, #tab-gacha, #tab-interception { zoom: var(--z); }
+#banner-dialog, #slot-dialog, #info-dialog, #recolor-dialog, #ic-dialog, #raid-dialog, #deck-dialog, #ach-dialog { zoom: var(--z); max-height: calc((100vh - 40px) / var(--z)); }
+#banner-dialog, #recolor-dialog, #raid-dialog { width: min(1200px, calc((100vw - 24px) / var(--z))); }
+#ic-dialog { width: min(1440px, calc((100vw - 24px) / var(--z))); }
+#info-dialog, #ach-dialog { width: min(980px, calc((100vw - 24px) / var(--z))); }
+#slot-dialog { width: min(480px, calc((100vw - 24px) / var(--z))); }
+#deck-dialog { width: min(720px, calc((100vw - 24px) / var(--z))); max-height: calc((100vh - 24px) / var(--z)); }
