@@ -28,7 +28,9 @@ const bossName = (b) => BOSS_SHORT[b] || b;
 // 칸마다 보스 이름을 테두리 없이 작게. 대부분 크라켄이라 크라켄은 회색, 다른 보스는 흰색 굵게
 const USUAL_BOSS = "크라켄";
 const gearName = (c, r) => (c ? `${c}${r ? ` ${r}` : ""}` : "");
-const gearBadge = (c, r) => (c ? `<span class="gear ${CORP_CLS[c] || ""}" title="${esc(c)} ${esc(r)}">${esc(c[0])}${esc(r?.[0] || "")}</span>` : "");
+// 장비 칩: 글자색 = 회사, 배경색 = 종류(화력·방어·지원)
+const ROLE_CLS = { 화력: "r-atk", 방어: "r-def", 지원: "r-sup" };
+const gearBadge = (c, r) => (c ? `<span class="gear ${CORP_CLS[c] || ""} ${ROLE_CLS[r] || ""}" title="${esc(c)} ${esc(r)}">${esc(c[0])}${esc(r?.[0] || "")}</span>` : "");
 
 // ---------- 목록 (항상 한 달 단위) ----------
 // 목록 맨 위 "N월 합계" 한 줄: 계정별 일반 모듈 합계, 풀버 모듈 합계(+), 운빨
