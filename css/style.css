@@ -613,6 +613,6 @@ dialog.wide, #banner-dialog, #recolor-dialog, #raid-dialog { width: min(1200px, 
 .ic-gears { max-width: none; }
 
 /* 장비 칩: 글자색 = 회사, 배경색 = 종류. 배경은 어둡고 옅게 해서 회사 색 글자가 묻히지 않게 */
-.gear.r-atk { background: #4a2a2a; }
-.gear.r-def { background: #233650; }
-.gear.r-sup { background: #213f2c; }
+.gear.r-atk { background: #6a2424; }
+.gear.r-def { background: #233f86; }
+.gear.r-sup { background: #23642f; }
