@@ -15,7 +15,7 @@ const today = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0
 const md = (d) => (d ? d.slice(2).replace(/-/g, ".") : "");
 const daysSince = (d) => (d ? Math.floor((Date.parse(today()) - Date.parse(d)) / 86400000) : null);
 
-const b = { info: null, members: {}, books: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null };
+const b = { info: null, members: {}, books: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
 
 // ---------- 저장 ----------
 async function loadBook(g) {
@@ -82,6 +82,12 @@ function split(g) {
     });
     const gone = book.entries.filter((e) => !used.has(e) && (e.left || roster.length)).map((e) => ({ e, unknown: !e.left }));
     gone.sort((x, y) => (y.e.left?.date || "").localeCompare(x.e.left?.date || ""));
+    // 가입순: 엑셀 줄 순서(예전 기록지는 위가 먼저 가입) → 엑셀 이후 들어온 사람은 가입일 → 기록 없는 사람은 맨 뒤
+    const joinKey = (x) => [x.e?.order ?? Infinity, x.e?.joinDate || "9999", x.m.nick];
+    const cmp = (a, c) => { const p = joinKey(a), q = joinKey(c); return p[0] - q[0] || p[1].localeCompare(q[1]) || p[2].localeCompare(q[2], "ko"); };
+    if (b.sort === "synchro") current.sort((a, c) => (c.m.synchro || 0) - (a.m.synchro || 0));
+    else if (b.sort === "name") current.sort((a, c) => a.m.nick.localeCompare(c.m.nick, "ko"));
+    else current.sort(cmp);
     return { current, gone, roster };
 }
 
@@ -110,7 +116,8 @@ function render() {
     const fetched = b.members[g]?.fetched_at;
     $("#rb-view").innerHTML = `
         <p class="muted">멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
-        <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small></h3>
+        <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small>
+            <select id="rb-sort" class="rb-sort">${[["join", "가입순"], ["synchro", "싱크로 높은 순"], ["name", "이름순"]].map(([k, l]) => `<option value="${k}" ${b.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></h3>
         ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>메모</th></tr></thead><tbody>
             ${current.map(({ m, e }, i) => `<tr data-member="${esc(m.id)}"><td class="muted">${i + 1}</td><td>${nickCell(e, m)}</td><td>${esc(e?.uid || rawUid(m)) || `<span class="dim">-</span>`}</td>
                 <td>${joinCell(e)}</td><td>${lvCell(e?.joinLevel, e?.joinSynchro)}</td><td>${campCell(e)}</td>
@@ -185,7 +192,7 @@ function parseSheet(sheet) {
     for (let r = 1; r <= maxRow; r++) if (t(r, 4) === "사유" || /^탈퇴/.test(t(r, 3))) { leftHead = r; break; }
     const junk = (s) => !s || /^\d+$/.test(s) || /부터$/.test(s) || /^한섭\)/.test(s) || /^유니온/.test(s);
     const rowInfo = (r) => {
-        const e = { uid: hasUid ? t(r, 1).replace(/\D/g, "") : "", nicks: t(r, nameCol).split(">").map((s) => s.trim()).filter(Boolean) };
+        const e = { uid: hasUid ? t(r, 1).replace(/\D/g, "") : "", nicks: t(r, nameCol).split(">").map((s) => s.trim()).filter(Boolean), order: r };
         for (let c = nameCol + 1; c <= 60; c++) {
             const m = t(r, c).match(JOIN);
             if (!m || (!m[1] && c !== nameCol + 1)) continue;
@@ -247,6 +254,7 @@ async function runImport(file) {
                 // 엑셀이 원본 기록이라, 허브에서 직접 고친 기록(manual)이 아니면 엑셀 값으로 덮어씀 (직접 고친 기록은 빈칸만 채움)
                 let touched = false;
                 const trust = e.src !== "manual";
+                if (x.order != null && e.order !== x.order) { e.order = x.order; touched = true; }
                 for (const k of ["uid", "joinDate", "joinLevel", "joinSynchro", "joinCampaign", "joinExtra", "memo"]) {
                     if (x[k] && (!e[k] || (trust && e[k] !== x[k]))) { e[k] = x[k]; touched = true; }
                 }
@@ -301,6 +309,7 @@ async function setup() {
         if (key) openEdit(b.books[b.current].entries.find((x) => x.key === key));
     });
     $("#rb-add").addEventListener("click", () => openEdit(null, null));
+    $("#rb-view").addEventListener("change", (e) => { if (e.target.id === "rb-sort") { b.sort = e.target.value; localStorage.setItem("hub_rb_sort", b.sort); render(); } });
     $("#rb-import").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) runImport(f); });
     $("#rb-form").addEventListener("submit", saveEdit);
     $("#rb-delete").addEventListener("click", removeEdit);

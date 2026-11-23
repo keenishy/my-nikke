@@ -647,3 +647,4 @@ dialog.wide, #banner-dialog, #recolor-dialog, #raid-dialog { width: min(1200px, 
 .rb-type.kick { color: var(--danger); }
 #rb-dialog { width: min(640px, calc((100vw - 24px) / var(--z))); }
 #rb-left-fields { border-top: 1px dashed var(--border); padding-top: 8px; }
+.rb-sort { margin-left: 8px; font-size: 0.8rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-weight: 400; }
