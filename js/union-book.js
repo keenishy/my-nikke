@@ -15,7 +15,7 @@ const today = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0
 const md = (d) => (d ? d.slice(2).replace(/-/g, ".") : "");
 const daysSince = (d) => (d ? Math.floor((Date.parse(today()) - Date.parse(d)) / 86400000) : null);
 
-const b = { info: null, members: {}, books: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
+const b = { info: null, members: {}, books: {}, raids: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
 
 // ---------- 저장 ----------
 async function loadBook(g) {
@@ -71,6 +71,26 @@ const guildIds = () => {
 };
 const guildName = (g) => b.info?.unions?.[g]?.name || g;
 
+// ---------- 레이드 참여율 (유니온 레이드 탭에 저장된 시즌 기록으로) ----------
+// 처음 공격한 시즌부터 최근 시즌까지 중 1번이라도 공격한 시즌 수
+function participation(g, m) {
+    const roster = b.members[g]?.list || [];
+    const ids = new Set(roster.map((x) => x.id));
+    const seasons = (b.raids[g] || []).filter((r) => r.attacks?.some((a) => ids.has(a.openid))) // 다른 유니온 기록이 잘못 저장된 시즌은 뺌
+        .sort((x, y) => Number(y.season) - Number(x.season));
+    if (!seasons.length) return null;
+    const hit = seasons.map((r) => r.attacks.some((a) => a.openid === m.id));
+    // 가입한 시즌은 알 수 없어서 처음 공격한 시즌부터 셈 (한 번도 공격 안 했으면 최근 1시즌)
+    const span = hit.lastIndexOf(true) + 1 || 1;
+    const n = hit.slice(0, span).filter(Boolean).length;
+    return { n, span, rate: n / span, last: hit[0] };
+}
+function partCell(p) {
+    if (!p) return `<span class="dim">-</span>`;
+    const cls = p.rate >= 0.8 ? "good" : p.rate >= 0.5 ? "warn-num" : "bad";
+    return `<b class="${cls}">${p.n}/${p.span}</b> <small class="muted">${Math.round(p.rate * 100)}%</small>${p.last ? "" : ` <small class="bad">이번 ✕</small>`}`;
+}
+
 function split(g) {
     const book = b.books[g] || { entries: [] };
     const roster = b.members[g]?.list || [];
@@ -85,7 +105,8 @@ function split(g) {
     // 가입순: 엑셀 줄 순서(예전 기록지는 위가 먼저 가입) → 엑셀 이후 들어온 사람은 가입일 → 기록 없는 사람은 맨 뒤
     const joinKey = (x) => [x.e?.order ?? Infinity, x.e?.joinDate || "9999", x.m.nick];
     const cmp = (a, c) => { const p = joinKey(a), q = joinKey(c); return p[0] - q[0] || p[1].localeCompare(q[1]) || p[2].localeCompare(q[2], "ko"); };
-    if (b.sort === "synchro") current.sort((a, c) => (c.m.synchro || 0) - (a.m.synchro || 0));
+    if (b.sort === "part") current.sort((a, c) => (participation(g, a.m, a.e)?.rate ?? 2) - (participation(g, c.m, c.e)?.rate ?? 2));
+    else if (b.sort === "synchro") current.sort((a, c) => (c.m.synchro || 0) - (a.m.synchro || 0));
     else if (b.sort === "name") current.sort((a, c) => a.m.nick.localeCompare(c.m.nick, "ko"));
     else current.sort(cmp);
     return { current, gone, roster };
@@ -117,11 +138,11 @@ function render() {
     $("#rb-view").innerHTML = `
         <p class="muted">멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
         <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small>
-            <select id="rb-sort" class="rb-sort">${[["join", "가입순"], ["synchro", "싱크로 높은 순"], ["name", "이름순"]].map(([k, l]) => `<option value="${k}" ${b.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></h3>
-        ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>메모</th></tr></thead><tbody>
+            <select id="rb-sort" class="rb-sort">${[["join", "가입순"], ["part", "참여율 낮은 순"], ["synchro", "싱크로 높은 순"], ["name", "이름순"]].map(([k, l]) => `<option value="${k}" ${b.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></h3>
+        ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>레이드 참여<br><small>참여 시즌 / 가입 후 시즌</small></th><th>메모</th></tr></thead><tbody>
             ${current.map(({ m, e }, i) => `<tr data-member="${esc(m.id)}"><td class="muted">${i + 1}</td><td>${nickCell(e, m)}</td><td>${esc(e?.uid || rawUid(m)) || `<span class="dim">-</span>`}</td>
                 <td>${joinCell(e)}</td><td>${lvCell(e?.joinLevel, e?.joinSynchro)}</td><td>${campCell(e)}</td>
-                <td>${lvCell(m.level, m.synchro)}</td><td class="rb-memo">${esc(e?.memo || "")}</td></tr>`).join("")}
+                <td>${lvCell(m.level, m.synchro)}</td><td>${partCell(participation(g, m, e))}</td><td class="rb-memo">${esc(e?.memo || "")}</td></tr>`).join("")}
         </tbody></table></div>` : `<p class="muted">멤버 목록이 아직 없습니다. 유니온 레이드 탭에서 「멤버 목록 갱신」을 눌러 주세요.</p>`}
         <h3 class="sec">나간 멤버 <small class="muted">${gone.length}명</small></h3>
         ${gone.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>닉네임</th><th>UID</th><th>가입일</th><th>나간 날</th><th>구분</th><th>사유</th><th>메모</th></tr></thead><tbody>
@@ -274,12 +295,13 @@ let initPromise = null;
 export const initRoster = () => (initPromise ||= setup());
 async function setup() {
     $("#rb-view").innerHTML = `<p class="empty">불러오는 중…</p>`;
-    const [infoDoc, memberSnap, bookSnap] = await Promise.all([
-        getDoc(doc(db, "union_info", "latest")), getDocs(collection(db, "union_members")), getDocs(collection(db, "union_book")),
+    const [infoDoc, memberSnap, bookSnap, raidSnap] = await Promise.all([
+        getDoc(doc(db, "union_info", "latest")), getDocs(collection(db, "union_members")), getDocs(collection(db, "union_book")), getDocs(collection(db, "union_raids")),
     ]);
     b.info = infoDoc.exists() ? JSON.parse(infoDoc.data().data) : null;
     memberSnap.forEach((d) => (b.members[d.id] = JSON.parse(d.data().data)));
     bookSnap.forEach((d) => (b.books[d.id] = JSON.parse(d.data().data)));
+    raidSnap.forEach((d) => { const x = JSON.parse(d.data().data); (b.raids[x.guild] ||= []).push(x); });
     // 예전 버전이 블라블라 값으로 잘못 넣은 UID 정리: 한 유니온에서 같은 UID가 3명 이상이면 그 UID는 비움
     for (const [g, book] of Object.entries(b.books)) {
         const count = {};
