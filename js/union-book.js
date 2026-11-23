@@ -15,7 +15,7 @@ const today = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0
 const md = (d) => (d ? d.slice(2).replace(/-/g, ".") : "");
 const daysSince = (d) => (d ? Math.floor((Date.parse(today()) - Date.parse(d)) / 86400000) : null);
 
-const b = { info: null, members: {}, books: {}, raids: {}, fixed: {}, diff: localStorage.getItem("hub_rb_diff") || "all", current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
+const b = { info: null, members: {}, books: {}, raids: {}, fixed: {}, fixedAsOf: "", diff: localStorage.getItem("hub_rb_diff") || "all", current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
 
 // ---------- 저장 ----------
 async function loadBook(g) {
@@ -28,7 +28,8 @@ const saveBook = (g) => setDoc(doc(db, "union_book", g), { data: JSON.stringify(
 
 const nickOf = (e) => e.nicks?.[e.nicks.length - 1] || "";
 const findById = (book, id) => (id ? book.entries.find((e) => e.id === id) : null);
-const findByNick = (book, nick) => book.entries.find((e) => !e.id && !e.left && (e.nicks || []).some((n) => squash(n) === squash(nick)));
+// id가 없거나 기준 명단으로 임시 id("uid:…")만 있는 기록은 닉네임으로 이어 붙임
+const findByNick = (book, nick) => book.entries.find((e) => (!e.id || e.id.startsWith("uid:")) && !e.left && (e.nicks || []).some((n) => squash(n) === squash(nick)));
 
 // 블라블라 멤버 정보(raw)의 필드 이름만으로 UID·가입 시각을 짐작하면 유니온 번호 같은 엉뚱한 값이 들어갈 수 있어서 쓰지 않음.
 // UID·가입일은 엑셀 가져오기나 직접 입력으로만 채움
@@ -49,7 +50,7 @@ export async function recordMemberChanges(g, prevList, list, at) {
             changed = true;
         }
         if (!e) continue;
-        if (!e.id) { e.id = m.id; changed = true; }
+        if (!e.id || e.id.startsWith("uid:")) { e.id = m.id; changed = true; }
         if (nickOf(e) !== m.nick) { e.nicks = [...(e.nicks || []), m.nick]; changed = true; }
         if (e.left && isNew) { e.left = null; changed = true; } // 다시 들어온 경우
     }
@@ -106,13 +107,37 @@ function fixedIndex(g, m, e) {
     return i;
 }
 
+// 블라블라 멤버 목록이 기준 명단보다 오래됐는지 (쿠키 만료 등으로 못 받은 사이 들어오고 나간 사람이 있음)
+const staleRoster = (g) => !!b.fixed[squash(guildName(g))] && !!b.fixedAsOf && (b.members[g]?.fetched_at || "").slice(0, 10) < b.fixedAsOf;
+// 지금 멤버 목록: 블라블라 목록이 최신이면 그대로, 기준 명단보다 오래됐으면 기준 명단 (블라블라에 있는 사람은 레벨·싱크로를 이어 붙임)
+function rosterOf(g) {
+    const api = b.members[g]?.list || [];
+    if (!staleRoster(g)) return api;
+    const book = b.books[g] || { entries: [] };
+    return b.fixed[squash(guildName(g))].map(([uid, nick]) => {
+        const e = book.entries.find((x) => x.uid === uid);
+        return api.find((m) => (e?.id && m.id === e.id) || nickMatch(m.nick, nick)) || { id: e?.id || `uid:${uid}`, nick: e ? nickOf(e) || nick : nick, level: null, synchro: null };
+    });
+}
+
 // 고정 순서에 있는 지금 멤버는 기록에 UID와 순서를 저장해 둠 (닉네임이 바뀌어도 UID로 이어지게)
+// 블라블라 목록이 기준 명단보다 오래됐으면, 기준 명단에 없는 사람은 나간 멤버로 (나간 날·사유는 직접)
 function applyFixed(g) {
     const book = b.books[g];
     const list = b.fixed[squash(guildName(g))];
     if (!book || !list) return false;
     let changed = false;
-    for (const m of b.members[g]?.list || []) {
+    if (staleRoster(g)) {
+        const uids = new Set(list.map(([uid]) => uid));
+        for (const m of b.members[g]?.list || []) {
+            if (fixedIndex(g, m, findById(book, m.id)) >= 0) continue;
+            let e = findById(book, m.id) || book.entries.find((x) => !x.left && (x.nicks || []).some((n) => nickMatch(n, m.nick)));
+            if (!e) { e = { key: newKey(), id: m.id, uid: "", nicks: [m.nick], joinDate: "", joinLevel: "", joinSynchro: "", joinCampaign: "", joinExtra: "", memo: "", left: null, src: "auto" }; book.entries.push(e); }
+            if (!e.left) { e.left = { date: "", type: "", reason: "" }; changed = true; }
+        }
+        for (const e of book.entries) if (!e.left && e.uid && !uids.has(e.uid) && e.src === "excel") { e.left = { date: "", type: "", reason: "" }; changed = true; }
+    }
+    for (const m of rosterOf(g)) {
         let e = findById(book, m.id) || book.entries.find((x) => !x.left && (x.nicks || []).some((n) => nickMatch(n, m.nick)));
         const i = fixedIndex(g, m, e);
         if (i < 0) continue;
@@ -126,7 +151,7 @@ function applyFixed(g) {
 
 function split(g) {
     const book = b.books[g] || { entries: [] };
-    const roster = b.members[g]?.list || [];
+    const roster = rosterOf(g);
     const used = new Set();
     const current = roster.map((m) => {
         const e = findById(book, m.id) || book.entries.find((x) => !used.has(x) && !x.left && (x.nicks || []).some((n) => squash(n) === squash(m.nick)));
@@ -169,6 +194,7 @@ function render() {
     const { current, gone, roster } = split(g);
     const fetched = b.members[g]?.fetched_at;
     $("#rb-view").innerHTML = `
+        ${staleRoster(g) ? `<p class="warn">블라블라 멤버 목록이 ${fetched ? new Date(fetched).toLocaleDateString("ko-KR") : "아직 없음"} 것이라, ${md(b.fixedAsOf)}에 정리한 명단으로 지금 멤버를 보여 줍니다. 명단에 없는 사람은 나간 멤버로 옮겼습니다(나간 날·사유는 줄을 눌러 입력). 쿠키를 갱신하고 「멤버 목록 갱신」을 하면 블라블라 목록을 따릅니다.</p>` : ""}
         <p class="muted">멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
         <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small>
             <select id="rb-sort" class="rb-sort">${[["join", "가입순"], ["part", "참여율 낮은 순"], ["synchro", "싱크로 높은 순"], ["name", "이름순"]].map(([k, l]) => `<option value="${k}" ${b.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></h3>
@@ -338,6 +364,7 @@ async function setup() {
     try {
         const fixed = await (await fetch("data/join-order.json")).json();
         for (const [name, list] of Object.entries(fixed)) if (!name.startsWith("_")) b.fixed[squash(name)] = list;
+        b.fixedAsOf = fixed._기준일 || "";
     } catch {}
     // 예전 버전이 블라블라 값으로 잘못 넣은 UID 정리: 한 유니온에서 같은 UID가 3명 이상이면 그 UID는 비움
     for (const [g, book] of Object.entries(b.books)) {
