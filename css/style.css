@@ -648,3 +648,9 @@ dialog.wide, #banner-dialog, #recolor-dialog, #raid-dialog { width: min(1200px, 
 #rb-dialog { width: min(640px, calc((100vw - 24px) / var(--z))); }
 #rb-left-fields { border-top: 1px dashed var(--border); padding-top: 8px; }
 .rb-sort { margin-left: 8px; font-size: 0.8rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-weight: 400; }
+
+/* 유니온 탭: 쿠키 갱신 방법 */
+.cookie-help { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
+.cookie-help summary { cursor: pointer; font-weight: 700; }
+.cookie-help ol { margin: 10px 0 6px; padding-left: 20px; line-height: 1.7; font-size: 0.92rem; }
+.cookie-help code { background: var(--bg); border-radius: 4px; padding: 1px 5px; font-size: 0.88em; }

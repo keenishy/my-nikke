@@ -167,7 +167,7 @@ async function cookieWarning() {
     if (!bad.length) return "";
     return `<p class="warn">블라블라 쿠키가 만료됐습니다: <b>${bad.map(([k]) => esc(COOKIE_LABEL[k] || k)).join(", ")}</b><br>
         그 계정으로 블라블라에 다시 로그인해서 cookie를 복사한 뒤, Cloudflare Worker의 같은 이름 비밀값에 새로 넣어 주세요. (확인 ${new Date(saved.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })})
-        <button class="btn small" id="cookie-recheck">지금 다시 확인</button></p>`;
+        <button class="btn small" id="cookie-recheck">지금 다시 확인</button> <button class="btn small" id="cookie-howto">갱신 방법 보기</button></p>`;
 }
 
 export async function renderDashboard() {
@@ -191,6 +191,13 @@ export async function renderDashboard() {
         ${achCard}
     </div>`;
     wireShifty(view);
+    // 갱신 방법: 유니온 레이드 탭의 안내를 펼쳐서 보여 줌
+    $("#cookie-howto")?.addEventListener("click", async () => {
+        document.querySelector('.hub-tab[data-tab="union"]').click();
+        for (let i = 0; i < 20 && !document.getElementById("cookie-help"); i++) await new Promise((r) => setTimeout(r, 150));
+        const d = document.getElementById("cookie-help");
+        if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    });
     // 쿠키를 바꿔 넣은 뒤 1시간을 기다리지 않고 바로 확인
     $("#cookie-recheck")?.addEventListener("click", (e) => {
         e.currentTarget.disabled = true;

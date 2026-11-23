@@ -57,11 +57,26 @@ function normalizeRaid(r) {
 }
 
 // ---------- 화면 ----------
+// 블라블라 쿠키 갱신 방법 (유니온 레이드 탭 위쪽에 접어 둠, 홈 쿠키 경고에서 바로 열 수 있음)
+const COOKIE_HELP = `<details class="cookie-help" id="cookie-help"><summary>블라블라 쿠키 갱신 방법 <small class="muted">(쿠키 만료 경고가 뜨거나 유니온·도감을 못 받을 때)</small></summary>
+    <ol>
+        <li><b>어떤 쿠키?</b> 홈 경고에 만료된 이름(BLA_COOKIE, Pastel6 …)이 나옵니다. <b>BLA_COOKIE = 케니</b>(도감·LOVEABLE·오늘 할 일). 나머지는 유니온마다 그 유니온 소속 계정 쿠키면 됩니다(아래 유니온 카드의 계정 칩 참고). 이름은 아무거나 상관없고 기존 이름에 덮어쓰면 됩니다.</li>
+        <li>크롬·웨일 <b>시크릿 창</b>을 새로 엽니다. 이미 열린 시크릿 창이 있으면 <b>모두 닫고</b> 새로 엽니다 (시크릿 창끼리는 로그인이 공유됨).</li>
+        <li><b>blablalink.com</b>에 그 계정으로 로그인하고, 오른쪽에 「캐릭터를 연동해 주세요」가 보이면 <b>연동</b>을 누릅니다.</li>
+        <li><b>F12</b>(개발자 도구)를 엽니다. 「Paused in debugger」로 멈추면 <b>Ctrl + F8</b> → <b>F8</b>.</li>
+        <li><b>Console</b> 탭에 <code>copy(document.cookie)</code> 입력 → Enter. (「allow pasting」 경고가 뜨면 <code>allow pasting</code> 입력 후 다시)<br>
+            메모장에 붙여서 <code>game_token=</code>이 있으면 OK. 없으면: <b>Network</b> 탭 → 「Disable cache」 체크 → F5 → <code>GetSavedRoleInfo</code> 클릭 → Headers → Request Headers의 <b>Cookie</b> 값 우클릭 → Copy value.</li>
+        <li><b>Cloudflare 대시보드</b> → Workers &amp; Pages → <b>my-nikke</b> → Settings → Variables and Secrets → 해당 이름 편집 → 붙여넣기 → 저장(Deploy).</li>
+        <li><b>블라블라에서 로그아웃하지 말고</b> 시크릿 창을 그냥 닫습니다 (로그아웃하면 방금 쿠키가 바로 무효). 다음 계정은 2번부터 다시.</li>
+        <li>허브 홈 경고의 「지금 다시 확인」(또는 연동 설정 「저장하고 연결 확인」)으로 ok인지 확인 → 이 탭에서 「멤버 목록 갱신」, 「안 받은 시즌 모두 불러오기」.</li>
+    </ol>
+    <p class="muted">쿠키 값은 계정 로그인 정보라 다른 곳에 올리지 마세요.</p></details>`;
+
 function render() {
     const ids = guildIds();
     if (!u.info) {
         $("#union-subtabs").innerHTML = "";
-        $("#union-view").innerHTML = `<div class="union-card"><p>블라블라에서 유니온 정보를 아직 받지 않았습니다.</p><div class="row"><button class="btn primary" id="un-refresh">유니온 정보 받기</button></div><p class="muted" id="un-status"></p></div>`;
+        $("#union-view").innerHTML = COOKIE_HELP + `<div class="union-card"><p>블라블라에서 유니온 정보를 아직 받지 않았습니다.</p><div class="row"><button class="btn primary" id="un-refresh">유니온 정보 받기</button></div><p class="muted" id="un-status"></p></div>`;
         return;
     }
     if (!ids.includes(u.current)) u.current = ids[0];
@@ -70,7 +85,7 @@ function render() {
     const accs = accountsOf(u.current);
     const key = `${u.current}_${u.season}`;
     const season = u.seasons.find((s) => String(s.id) === u.season);
-    $("#union-view").innerHTML = `
+    $("#union-view").innerHTML = COOKIE_HELP + `
         <div class="union-card">
             <div class="union-head">
                 <div><h2>${esc(x.name)}</h2><div class="muted">유니온 레벨 ${x.level ?? "-"} · 인원 ${x.members ?? "-"}/${x.max ?? "-"} · 활동 ${(x.activity ?? 0).toLocaleString()}</div></div>
