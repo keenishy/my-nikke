@@ -616,3 +616,23 @@ dialog.wide, #banner-dialog, #recolor-dialog, #raid-dialog { width: min(1200px, 
 .gear.r-atk { background: #6a2424; }
 .gear.r-def { background: #233f86; }
 .gear.r-sup { background: #23642f; }
+
+/* 솔레·협작 입력 창: 계정마다 한 줄 (계정·% 확정·+회차 | 회차: 점수·상위%·덱·✕ | 메모) */
+#raid-dialog { width: min(1440px, calc((100vw - 24px) / var(--z))); }
+.raid-accounts { display: flex; flex-direction: column; gap: 6px; }
+.racc { display: grid; grid-template-columns: 128px minmax(0, 1fr) 230px; gap: 10px; align-items: start; padding: 8px 10px; }
+.racc-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; margin-bottom: 0; }
+.racc-head b { font-size: 1rem; grid-column: 1; grid-row: 1; }
+.racc-head [data-addrun] { grid-column: 2; grid-row: 1; padding: 3px 6px; }
+.racc-head .pct-final { grid-column: 1 / -1; grid-row: 2; margin: 0; flex-direction: row !important; align-items: center; gap: 4px; }
+.racc-head .pct-final input { width: auto; margin: 0; }
+.racc-head .pct-final { justify-content: flex-start; white-space: nowrap; }
+.racc .run { grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1.4fr) 36px; margin-bottom: 6px; }
+.racc .run .deck-btn { grid-column: auto; order: 3; }
+.racc .run > .btn { order: 4; }
+.racc .runs .run:last-child { margin-bottom: 0; }
+@media (max-width: 900px) {
+    .racc { grid-template-columns: 1fr; }
+    .racc .run { grid-template-columns: minmax(0, 1fr) 128px auto; }
+    .racc .run .deck-btn { grid-column: 1 / -1; }
+}
