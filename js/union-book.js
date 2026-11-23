@@ -60,6 +60,7 @@ export async function recordMemberChanges(g, prevList, list, at) {
         if (!e) { e = { key: newKey(), id: p.id, uid: "", nicks: [p.nick], joinDate: "", joinLevel: "", joinSynchro: "", joinCampaign: "", joinExtra: "", memo: "", left: null, src: "auto" }; book.entries.push(e); }
         if (!e.left) { e.left = { date, type: "", reason: "" }; changed = true; }
     }
+    if (applyFixed(g)) changed = true; // 멤버 목록 갱신 뒤에도 기준 명단(UID·순서) 맞추기
     if (changed) await saveBook(g);
     if (b.current === g && $("#rb-view")) render();
 }
@@ -138,13 +139,26 @@ function applyFixed(g) {
         for (const e of book.entries) if (!e.left && e.uid && !uids.has(e.uid) && e.src === "excel") { e.left = { date: "", type: "", reason: "" }; changed = true; }
     }
     for (const m of rosterOf(g)) {
-        let e = findById(book, m.id) || book.entries.find((x) => !x.left && (x.nicks || []).some((n) => nickMatch(n, m.nick)));
-        const i = fixedIndex(g, m, e);
+        const i = fixedIndex(g, m, findById(book, m.id));
         if (i < 0) continue;
+        const uid = list[i][0];
+        // 같은 사람 기록이 둘로 나뉘어 있으면(예: 엑셀 기록 + 멤버 목록 갱신 때 자동으로 생긴 기록) UID 쪽으로 합침
+        const byUid = book.entries.find((x) => x.uid === uid);
+        const byId = findById(book, m.id);
+        if (byUid && byId && byUid !== byId) {
+            for (const k of ["joinDate", "joinLevel", "joinSynchro", "joinCampaign", "joinExtra", "memo"]) if (!byUid[k] && byId[k]) byUid[k] = byId[k];
+            for (const n of byId.nicks || []) if (!(byUid.nicks || []).includes(n)) byUid.nicks = [...(byUid.nicks || []), n];
+            book.entries = book.entries.filter((x) => x !== byId);
+            changed = true;
+        }
+        let e = byUid || findById(book, m.id) || book.entries.find((x) => !x.left && (x.nicks || []).some((n) => nickMatch(n, m.nick)));
         if (!e) { e = { key: newKey(), id: m.id, uid: "", nicks: [m.nick], joinDate: "", joinLevel: "", joinSynchro: "", joinCampaign: "", joinExtra: "", memo: "", left: null, src: "excel" }; book.entries.push(e); changed = true; }
-        if (!e.id) { e.id = m.id; changed = true; }
-        if (!e.uid) { e.uid = list[i][0]; changed = true; }
+        if (e.id !== m.id) { e.id = m.id; changed = true; }
+        if (!e.uid) { e.uid = uid; changed = true; }
         if (e.order !== i + 1) { e.order = i + 1; changed = true; }
+        if (nickOf(e) !== m.nick) { e.nicks = [...(e.nicks || []).filter((n) => n !== m.nick), m.nick]; changed = true; }
+        // 지금 명단에 있는데 나간 멤버로 표시된 기록(기준 명단과 닉이 안 맞아 옮겨졌던 것)은 되돌림
+        if (e.left && !e.left.date && !e.left.type && !e.left.reason) { e.left = null; changed = true; }
     }
     return changed;
 }
