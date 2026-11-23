@@ -5,7 +5,7 @@ import { readWorkbook } from "./xlsx-colors.js";
 
 // 유니온 멤버 기록부 (union_book/{유니온} = { data: JSON { entries: [기록] } })
 // 기록: { key, id: 블라블라 멤버 id|"", uid, nicks: [예전 닉 … 지금 닉], joinDate: "YYYY-MM-DD", joinLevel, joinSynchro,
-//         joinCampaign: "48-36 40-35", joinExtra, memo, left: null | { date, type: "탈퇴"|"추방"|"", reason }, src: "excel"|"auto"|"manual" }
+//         joinCampaign: "노말 하드" (예: "48-36 40-35"), joinExtra: 타워 층수, memo, left: null | { date, type: "탈퇴"|"추방"|"", reason }, src: "excel"|"auto"|"manual" }
 // 지금 멤버는 유니온 탭에서 받은 멤버 목록(union_members)과 id(없으면 닉네임)로 이어 붙여 보여 줌
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -102,6 +102,12 @@ const nickCell = (e, m) => {
     return `<b>${esc(now)}</b>${old.length ? `<div class="muted small">예전: ${old.map(esc).join(" → ")}</div>` : ""}`;
 };
 const joinCell = (e) => (e?.joinDate ? `${md(e.joinDate)}<div class="muted small">${daysSince(e.joinDate)}일째</div>` : `<span class="dim">-</span>`);
+// 캠페인 칸: "48-36 40-35" + 타워 → "N 48-36 · H 40-35 · 타워 1089층"
+function campCell(e) {
+    const [n, h] = String(e?.joinCampaign || "").split(/\s+/);
+    const parts = [n && `<span class="muted">N</span> ${esc(n)}`, h && `<span class="muted">H</span> ${esc(h)}`, e?.joinExtra && `<span class="muted">타워</span> ${esc(e.joinExtra)}층`].filter(Boolean);
+    return parts.join(" · ") || `<span class="dim">-</span>`;
+}
 const lvCell = (lv, sy) => (lv || sy ? `${lv || "-"} / ${sy || "-"}` : `<span class="dim">-</span>`);
 
 function render() {
@@ -115,9 +121,9 @@ function render() {
     $("#rb-view").innerHTML = `
         <p class="muted">멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
         <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small></h3>
-        ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>레벨 / 싱크로</small></th><th>가입 당시<br><small>캠페인</small></th><th>지금<br><small>레벨 / 싱크로</small></th><th>메모</th></tr></thead><tbody>
+        ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>메모</th></tr></thead><tbody>
             ${current.map(({ m, e }, i) => `<tr data-member="${esc(m.id)}"><td class="muted">${i + 1}</td><td>${nickCell(e, m)}</td><td>${esc(e?.uid || rawUid(m)) || `<span class="dim">-</span>`}</td>
-                <td>${joinCell(e)}</td><td>${lvCell(e?.joinLevel, e?.joinSynchro)}</td><td>${esc(e?.joinCampaign || "")}${e?.joinExtra ? ` <small class="muted">${esc(e.joinExtra)}</small>` : ""}</td>
+                <td>${joinCell(e)}</td><td>${lvCell(e?.joinLevel, e?.joinSynchro)}</td><td>${campCell(e)}</td>
                 <td>${lvCell(m.level, m.synchro)}</td><td class="rb-memo">${esc(e?.memo || "")}</td></tr>`).join("")}
         </tbody></table></div>` : `<p class="muted">멤버 목록이 아직 없습니다. 유니온 레이드 탭에서 「멤버 목록 갱신」을 눌러 주세요.</p>`}
         <h3 class="sec">나간 멤버 <small class="muted">${gone.length}명</small></h3>
@@ -175,7 +181,7 @@ async function removeEdit() {
 
 // ---------- 예전 레이드 기록지(엑셀) 가져오기 ----------
 // 시트 이름 = 유니온 이름. 위쪽은 지금 멤버(UID | 닉네임 | 시즌별 공격 순번…), "사유" 머리줄 아래는 나간 멤버(UID | 닉네임 | 탈퇴일 | 사유)
-// 가입 칸 "260815 771 630" = 가입일 레벨 싱크로, 그 오른쪽 "48-36 40-35 1089" = 캠페인 노말 하드 (+숫자 하나)
+// 가입 칸 "260815 771 630" = 가입일 지휘관 레벨 싱크로, 그 오른쪽 "48-36 40-35 1089" = 캠페인 노말 하드 타워(층)
 const JOIN = /^(2[3-9][01]\d[0-3]\d)?\s*(\d{2,4})\s*\/?\s*(\d{2,4})$/;
 const CAMP = /^(\d+-\d+[A-Z]?)\s+(\d+-\d+[A-Z]?)(?:\s+(\d+))?/i;
 const ymd = (s) => (s ? `20${s.slice(0, 2)}-${s.slice(2, 4)}-${s.slice(4, 6)}` : "");
