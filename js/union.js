@@ -64,8 +64,9 @@ const COOKIE_HELP = `<details class="cookie-help" id="cookie-help"><summary>블�
         <li>크롬·웨일 <b>시크릿 창</b>을 새로 엽니다. 이미 열린 시크릿 창이 있으면 <b>모두 닫고</b> 새로 엽니다 (시크릿 창끼리는 로그인이 공유됨).</li>
         <li><b>blablalink.com</b>에 그 계정으로 로그인하고, 오른쪽에 「캐릭터를 연동해 주세요」가 보이면 <b>연동</b>을 누릅니다.</li>
         <li><b>F12</b>(개발자 도구)를 엽니다. 「Paused in debugger」로 멈추면 <b>Ctrl + F8</b> → <b>F8</b>.</li>
-        <li><b>Console</b> 탭에 <code>copy(document.cookie)</code> 입력 → Enter. (「allow pasting」 경고가 뜨면 <code>allow pasting</code> 입력 후 다시)<br>
-            메모장에 붙여서 <code>game_token=</code>이 있으면 OK. 없으면: <b>Network</b> 탭 → 「Disable cache」 체크 → F5 → <code>GetSavedRoleInfo</code> 클릭 → Headers → Request Headers의 <b>Cookie</b> 값 우클릭 → Copy value.</li>
+        <li><b>Network</b> 탭 → 「<b>Disable cache</b>」 체크 → 필터 <b>Fetch/XHR</b> → <b>F5</b> → 목록에서 <code>GetSavedRoleInfo</code> 클릭 → Headers → Request Headers의 <b>Cookie</b> 값 우클릭 → <b>Copy value</b>.<br>
+            <code>game_token=</code>과 <code>game_openid=</code>이 들어 있으면 OK. 「Provisional headers are shown」만 보이면 다른 <code>Get…</code> 요청을 누릅니다.
+            <span class="muted">(Console의 <code>copy(document.cookie)</code>로는 로그인 토큰이 안 나와서 쓸 수 없음)</span></li>
         <li><b>Cloudflare 대시보드</b> → Workers &amp; Pages → <b>my-nikke</b> → Settings → Variables and Secrets → 해당 이름 편집 → 붙여넣기 → 저장(Deploy).</li>
         <li><b>블라블라에서 로그아웃하지 말고</b> 시크릿 창을 그냥 닫습니다 (로그아웃하면 방금 쿠키가 바로 무효). 다음 계정은 2번부터 다시.</li>
         <li>허브 홈 경고의 「지금 다시 확인」(또는 연동 설정 「저장하고 연결 확인」)으로 ok인지 확인 → 이 탭에서 「멤버 목록 갱신」, 「안 받은 시즌 모두 불러오기」.</li>
