@@ -30,18 +30,9 @@ const nickOf = (e) => e.nicks?.[e.nicks.length - 1] || "";
 const findById = (book, id) => (id ? book.entries.find((e) => e.id === id) : null);
 const findByNick = (book, nick) => book.entries.find((e) => !e.id && !e.left && (e.nicks || []).some((n) => squash(n) === squash(nick)));
 
-// 블라블라 멤버 정보에 UID나 가입 시각이 들어 있으면 같이 씀 (필드 이름은 블라블라가 정함)
-function rawUid(m) {
-    const r = m.raw || {};
-    const k = Object.keys(r).find((x) => /(^|_)uid$|role_?id/i.test(x));
-    return k ? String(r[k]) : "";
-}
-function rawJoin(m) {
-    const r = m.raw || {};
-    const k = Object.keys(r).find((x) => /join/i.test(x));
-    const v = k ? Number(r[k]) : 0;
-    return v > 1e9 ? new Date((v > 1e12 ? v : v * 1000) + 9 * 3600 * 1000).toISOString().slice(0, 10) : "";
-}
+// 블라블라 멤버 정보(raw)의 필드 이름만으로 UID·가입 시각을 짐작하면 유니온 번호 같은 엉뚱한 값이 들어갈 수 있어서 쓰지 않음.
+// UID·가입일은 엑셀 가져오기나 직접 입력으로만 채움
+const rawUid = () => "";
 
 // ---------- 유니온 탭에서 멤버 목록을 갱신할 때 들어오고 나간 사람을 자동으로 기록 ----------
 export async function recordMemberChanges(g, prevList, list, at) {
@@ -51,22 +42,21 @@ export async function recordMemberChanges(g, prevList, list, at) {
     for (const m of list) {
         let e = findById(book, m.id) || findByNick(book, m.nick);
         const isNew = prevList && !prevList.some((p) => p.id === m.id);
-        if (!e && (isNew || rawJoin(m))) {
-            e = { key: newKey(), id: m.id, uid: rawUid(m), nicks: [m.nick], joinDate: rawJoin(m) || date, joinLevel: m.level ?? "", joinSynchro: m.synchro ?? "",
+        if (!e && isNew) {
+            e = { key: newKey(), id: m.id, uid: "", nicks: [m.nick], joinDate: date, joinLevel: m.level ?? "", joinSynchro: m.synchro ?? "",
                 joinCampaign: "", joinExtra: "", memo: "", left: null, src: "auto" };
             book.entries.push(e);
             changed = true;
         }
         if (!e) continue;
         if (!e.id) { e.id = m.id; changed = true; }
-        if (!e.uid && rawUid(m)) { e.uid = rawUid(m); changed = true; }
         if (nickOf(e) !== m.nick) { e.nicks = [...(e.nicks || []), m.nick]; changed = true; }
         if (e.left && isNew) { e.left = null; changed = true; } // 다시 들어온 경우
     }
     for (const p of prevList || []) {
         if (list.some((m) => m.id === p.id)) continue;
         let e = findById(book, p.id) || findByNick(book, p.nick);
-        if (!e) { e = { key: newKey(), id: p.id, uid: rawUid(p), nicks: [p.nick], joinDate: "", joinLevel: "", joinSynchro: "", joinCampaign: "", joinExtra: "", memo: "", left: null, src: "auto" }; book.entries.push(e); }
+        if (!e) { e = { key: newKey(), id: p.id, uid: "", nicks: [p.nick], joinDate: "", joinLevel: "", joinSynchro: "", joinCampaign: "", joinExtra: "", memo: "", left: null, src: "auto" }; book.entries.push(e); }
         if (!e.left) { e.left = { date, type: "", reason: "" }; changed = true; }
     }
     if (changed) await saveBook(g);
@@ -167,7 +157,7 @@ async function saveEdit(ev) {
     if (!x.nicks.length) { f.nicks.focus(); return; }
     Object.assign(x, { uid: f.uid.value.trim(), joinDate: f.joinDate.value, joinLevel: f.joinLevel.value.trim(), joinSynchro: f.joinSynchro.value.trim(),
         joinCampaign: f.joinCampaign.value.trim(), joinExtra: f.joinExtra.value.trim(), memo: f.memo.value.trim(),
-        left: f.isLeft.checked ? { date: f.leftDate.value, type: f.leftType.value, reason: f.leftReason.value.trim() } : null });
+        left: f.isLeft.checked ? { date: f.leftDate.value, type: f.leftType.value, reason: f.leftReason.value.trim() } : null, src: "manual" });
     if (b.editing.isNew) book.entries.push(x);
     try { await saveBook(g); $("#rb-dialog").close(); render(); } catch (err) { alert(`저장하지 못했습니다: ${err.message}`); }
 }
@@ -254,10 +244,14 @@ async function runImport(file) {
                     added++;
                     continue;
                 }
+                // 엑셀이 원본 기록이라, 허브에서 직접 고친 기록(manual)이 아니면 엑셀 값으로 덮어씀 (직접 고친 기록은 빈칸만 채움)
                 let touched = false;
-                for (const k of ["uid", "joinDate", "joinLevel", "joinSynchro", "joinCampaign", "joinExtra", "memo"]) if (!e[k] && x[k]) { e[k] = x[k]; touched = true; }
+                const trust = e.src !== "manual";
+                for (const k of ["uid", "joinDate", "joinLevel", "joinSynchro", "joinCampaign", "joinExtra", "memo"]) {
+                    if (x[k] && (!e[k] || (trust && e[k] !== x[k]))) { e[k] = x[k]; touched = true; }
+                }
                 for (const n of x.nicks) if (!(e.nicks || []).includes(n)) { e.nicks = [n, ...(e.nicks || [])]; touched = true; }
-                if (!e.left && x.left) { e.left = x.left; touched = true; }
+                if (x.left && (!e.left || (trust && !e.left.reason && !e.left.type))) { e.left = x.left; touched = true; }
                 if (touched) filled++;
             }
             await saveBook(p.g);
@@ -278,6 +272,19 @@ async function setup() {
     b.info = infoDoc.exists() ? JSON.parse(infoDoc.data().data) : null;
     memberSnap.forEach((d) => (b.members[d.id] = JSON.parse(d.data().data)));
     bookSnap.forEach((d) => (b.books[d.id] = JSON.parse(d.data().data)));
+    // 예전 버전이 블라블라 값으로 잘못 넣은 UID 정리: 한 유니온에서 같은 UID가 3명 이상이면 그 UID는 비움
+    for (const [g, book] of Object.entries(b.books)) {
+        const count = {};
+        for (const e of book.entries) if (e.uid) count[e.uid] = (count[e.uid] || 0) + 1;
+        const bad = Object.keys(count).filter((k) => count[k] >= 3);
+        // 같은 날 자동으로 3명 이상 "가입"한 기록도 예전 버전이 한꺼번에 만든 것이라 가입 정보를 비움 (엑셀에 있으면 가져오기로 다시 채워짐)
+        const autoDay = {};
+        for (const e of book.entries) if (e.src === "auto" && e.joinDate) autoDay[e.joinDate] = (autoDay[e.joinDate] || 0) + 1;
+        const badDays = Object.keys(autoDay).filter((d) => autoDay[d] >= 3);
+        for (const e of book.entries) if (e.src === "auto" && badDays.includes(e.joinDate)) Object.assign(e, { joinDate: "", joinLevel: "", joinSynchro: "" });
+        if (bad.length) for (const e of book.entries) if (bad.includes(e.uid)) e.uid = "";
+        if (bad.length || badDays.length) saveBook(g).catch(() => {});
+    }
     for (const g of guildIds()) b.books[g] ||= { entries: [] };
 
     $("#rb-subtabs").addEventListener("click", (e) => {
