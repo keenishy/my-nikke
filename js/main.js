@@ -4,6 +4,7 @@ import { initCollection } from "./collection.js";
 import { initGacha } from "./gacha.js";
 import { initRaid } from "./raid.js";
 import { initUnion } from "./union.js";
+import { initRoster } from "./union-book.js";
 import { initIntercept } from "./intercept.js";
 import { renderDashboard } from "./dashboard.js";
 
@@ -20,6 +21,10 @@ const NATIVE_TABS = {
     union: () => initUnion().catch((e) => {
         console.error(e);
         document.getElementById("union-view").innerHTML = `<p class="empty">유니온 정보를 불러오지 못했습니다: ${e.message}</p>`;
+    }),
+    roster: () => initRoster().catch((e) => {
+        console.error(e);
+        document.getElementById("rb-view").innerHTML = `<p class="empty">멤버 기록을 불러오지 못했습니다: ${e.message}</p>`;
     }),
     // 홈은 열 때마다 최신 상태로 다시 그림
     dashboard: () => renderDashboard().catch((e) => {

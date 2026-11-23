@@ -18,7 +18,7 @@
 
 const API = "https://api.blablalink.com/api/";
 const AREA = 83; // 한국 서버
-const VERSION = "2026-11-08"; // 허브에서 배포된 코드가 최신인지 확인용
+const VERSION = "2026-11-23"; // 허브에서 배포된 코드가 최신인지 확인용
 const COMMON = { game_id: "29080", area_id: "global", source: "pc_web", intl_game_id: "29080", language: "ko", env: "prod" };
 
 const cors = {
@@ -211,7 +211,9 @@ export default {
       if (codeOf(text) !== 0) return reply({ error: "멤버 목록을 받지 못했습니다", detail: text.slice(0, 300) }, 502);
       const items = JSON.parse(text).data?.items || [];
       return reply({ guild, fetched_at: new Date().toISOString(),
-        members: items.map((m) => ({ id: m.member_id, nick: m.nickname, level: m.level, synchro: m.synchro_level })) });
+        // raw: 블라블라가 주는 나머지 값(UID·가입 시각 등이 있으면 허브 멤버 기록에서 씀)
+        members: items.map((m) => ({ id: m.member_id, nick: m.nickname, level: m.level, synchro: m.synchro_level,
+          raw: Object.fromEntries(Object.entries(m).filter(([, v]) => v == null || typeof v !== "object")) })) });
     }
 
     return reply({ error: "없는 주소입니다" }, 404);

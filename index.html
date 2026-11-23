@@ -26,6 +26,7 @@
             <button class="hub-tab" data-tab="gacha">가챠 기록</button>
             <button class="hub-tab" data-tab="ranking">협작·솔레</button>
             <button class="hub-tab" data-tab="union">유니온 레이드</button>
+            <button class="hub-tab" data-tab="roster">멤버 기록</button>
             <button class="hub-tab" data-tab="interception">특특요</button>
         </nav>
         <button class="btn small user-btn" id="user-btn" hidden>로그아웃</button>
@@ -104,6 +105,16 @@
             <div id="raid-view"></div>
             <p class="muted foot-link">예전 레이드 기록부: <a href="https://keenishy.github.io/nikke-ranking/" target="_blank" rel="noopener">열기</a></p>
             <datalist id="raid-bosses"></datalist>
+        </section>
+        <section class="tab-panel" id="tab-roster">
+            <div class="toolbar">
+                <div class="view-toggle" id="rb-subtabs"></div>
+                <span class="spacer"></span>
+                <span class="muted" id="rb-status"></span>
+                <button class="btn" id="rb-add">+ 직접 추가</button>
+                <label class="btn" title="예전 레이드 기록지(유니온 이름 시트)에서 UID·가입일·나간 멤버를 가져옵니다">엑셀에서 가져오기<input type="file" id="rb-import" accept=".xlsx" hidden></label>
+            </div>
+            <div id="rb-view"></div>
         </section>
         <section class="tab-panel" id="tab-union">
             <div class="toolbar"><div class="view-toggle" id="union-subtabs"></div></div>
@@ -238,6 +249,31 @@
         </div>
         <div id="ic-accounts" class="ic-accounts"></div>
         <div class="row end"><span class="muted" id="ic-status"></span><button class="btn primary" id="ic-save">저장</button></div>
+    </dialog>
+
+    <dialog id="rb-dialog">
+        <button class="close" data-close aria-label="닫기">✕</button>
+        <h2 id="rb-title">멤버 기록</h2>
+        <form id="rb-form" class="form form-grid">
+            <label class="span2">닉네임 <small class="muted">(바뀐 닉은 「예전 &gt; 지금」)</small><input name="nicks" autocomplete="off" required></label>
+            <label>UID<input name="uid" inputmode="numeric" autocomplete="off"></label>
+            <label>가입일<input name="joinDate" type="date"></label>
+            <label>가입 당시 레벨<input name="joinLevel" inputmode="numeric" autocomplete="off"></label>
+            <label>가입 당시 싱크로<input name="joinSynchro" inputmode="numeric" autocomplete="off"></label>
+            <label>가입 당시 캠페인 <small class="muted">(노말 하드)</small><input name="joinCampaign" placeholder="48-36 40-35" autocomplete="off"></label>
+            <label>가입 당시 기타<input name="joinExtra" autocomplete="off"></label>
+            <label class="span2">메모<input name="memo" class="memo" autocomplete="off"></label>
+            <label class="span2 check"><input name="isLeft" type="checkbox">나간 멤버</label>
+            <div id="rb-left-fields" class="span2 form-grid" hidden>
+                <label>나간 날<input name="leftDate" type="date"></label>
+                <label>구분<select name="leftType"><option value="">-</option><option>탈퇴</option><option>추방</option></select></label>
+                <label class="span2">사유<input name="leftReason" placeholder="3일 미접, 활동포인트 미달 등" autocomplete="off"></label>
+            </div>
+            <div class="row end span2">
+                <button type="button" class="btn danger" id="rb-delete" hidden>기록 삭제</button>
+                <button type="submit" class="btn primary">저장</button>
+            </div>
+        </form>
     </dialog>
 
     <dialog id="ach-dialog">

@@ -3,6 +3,7 @@ import { db } from "./store.js";
 import { ACCOUNTS } from "./config.js";
 import { cdnUrl, loadNikkeList, portraitUrl, ELEMENT, ELEMENT_ICON } from "./meta.js";
 import { fetchUnions, fetchUnionRaid, fetchUnionMembers, getAccessKey } from "./sync.js";
+import { recordMemberChanges, setRosterMembers } from "./union-book.js";
 
 // 저장 위치 (허브 Firebase)
 //   union_info/latest          : 계정별 소속 유니온 + 유니온 공개 정보 (블라블라에서 받은 그대로)
@@ -310,6 +311,9 @@ async function refreshMembers(silent = false, g = u.current) {
         if (prev) for (const m of r.members) if (!prev.list.some((p) => p.id === m.id) && !firstSeen[m.id]) firstSeen[m.id] = r.fetched_at;
         u.members[g] = { fetched_at: r.fetched_at, list: r.members, firstSeen };
         await setDoc(doc(db, "union_members", g), { data: JSON.stringify(u.members[g]) });
+        // 멤버 기록 탭: 새로 들어오거나 나간 사람 자동 기록
+        setRosterMembers(g, u.members[g]);
+        recordMemberChanges(g, prev?.list || null, r.members, r.fetched_at).catch((e) => console.warn("멤버 기록 실패", e));
         render();
     } catch (e) { if (!silent) $("#un-raid-status").textContent = `멤버 목록 실패: ${e.message}`; }
 }

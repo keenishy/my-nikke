@@ -636,3 +636,14 @@ dialog.wide, #banner-dialog, #recolor-dialog, #raid-dialog { width: min(1200px, 
     .racc .run { grid-template-columns: minmax(0, 1fr) 128px auto; }
     .racc .run .deck-btn { grid-column: 1 / -1; }
 }
+
+/* 멤버 기록 탭 */
+.rb-table td, .rb-table th { text-align: center; white-space: nowrap; }
+.rb-table td:nth-child(2) { text-align: left; }
+.rb-table tbody tr { cursor: pointer; }
+.rb-table tbody tr:hover td { background: var(--hover); }
+.rb-table .rb-memo { text-align: left; white-space: normal; max-width: 260px; color: var(--muted); }
+.rb-type { font-weight: 700; color: var(--muted); }
+.rb-type.kick { color: var(--danger); }
+#rb-dialog { width: min(640px, calc((100vw - 24px) / var(--z))); }
+#rb-left-fields { border-top: 1px dashed var(--border); padding-top: 8px; }
