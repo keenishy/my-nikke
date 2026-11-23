@@ -99,7 +99,17 @@ function partCell(p) {
 }
 
 // 고정 가입 순서 (data/join-order.json, 유니온 이름별 [UID, 닉네임] 목록)에서 이 멤버의 자리
-const nickMatch = (a, c) => { a = squash(a).replace(/…$/, ""); c = squash(c).replace(/…$/, ""); return !!a && !!c && (a === c || a.startsWith(c) || c.startsWith(a)); };
+// 닉네임 비교: 같거나, 엑셀에서 잘린 닉(…)이면 앞부분, 5글자 이상이면 한 글자 차이(모양이 비슷한 한자 등)까지 같은 사람으로
+const nickMatch = (a, c) => {
+    a = squash(a).replace(/…$/, "").normalize("NFKC");
+    c = squash(c).replace(/…$/, "").normalize("NFKC");
+    if (!a || !c) return false;
+    if (a === c || a.startsWith(c) || c.startsWith(a)) return true;
+    if (a.length !== c.length || a.length < 5) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== c[i] && ++diff > 1) return false;
+    return true;
+};
 function fixedIndex(g, m, e) {
     const list = b.fixed[squash(guildName(g))];
     if (!list) return -1;
@@ -209,7 +219,7 @@ function render() {
     const fetched = b.members[g]?.fetched_at;
     $("#rb-view").innerHTML = `
         ${staleRoster(g) ? `<p class="warn">블라블라 멤버 목록이 ${fetched ? new Date(fetched).toLocaleDateString("ko-KR") : "아직 없음"} 것이라, ${md(b.fixedAsOf)}에 정리한 명단으로 지금 멤버를 보여 줍니다. 명단에 없는 사람은 나간 멤버로 옮겼습니다(나간 날·사유는 줄을 눌러 입력). 쿠키를 갱신하고 「멤버 목록 갱신」을 하면 블라블라 목록을 따릅니다.</p>` : ""}
-        <p class="muted">멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
+        <p class="muted"><small class="rb-ver">멤버 기록 v11-24</small> 멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
         <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small>
             <select id="rb-sort" class="rb-sort">${[["join", "가입순"], ["part", "참여율 낮은 순"], ["synchro", "싱크로 높은 순"], ["name", "이름순"]].map(([k, l]) => `<option value="${k}" ${b.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></h3>
         ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>레이드 참여 <select id="rb-diff" class="rb-sort">${[["all", "전체"], ["hard", "하드"], ["normal", "노말"]].map(([k, l]) => `<option value="${k}" ${b.diff === k ? "selected" : ""}>${l}</option>`).join("")}</select><br><small>참여 시즌 / 처음 공격 뒤 시즌</small></th><th>메모</th></tr></thead><tbody>
