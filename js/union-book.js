@@ -15,7 +15,7 @@ const today = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0
 const md = (d) => (d ? d.slice(2).replace(/-/g, ".") : "");
 const daysSince = (d) => (d ? Math.floor((Date.parse(today()) - Date.parse(d)) / 86400000) : null);
 
-const b = { info: null, members: {}, books: {}, raids: {}, fixed: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
+const b = { info: null, members: {}, books: {}, raids: {}, fixed: {}, diff: localStorage.getItem("hub_rb_diff") || "all", current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
 
 // ---------- 저장 ----------
 async function loadBook(g) {
@@ -72,23 +72,28 @@ const guildIds = () => {
 const guildName = (g) => b.info?.unions?.[g]?.name || g;
 
 // ---------- 레이드 참여율 (유니온 레이드 탭에 저장된 시즌 기록으로) ----------
-// 처음 공격한 시즌부터 최근 시즌까지 중 1번이라도 공격한 시즌 수
-function participation(g, m) {
+// 처음 공격한 시즌(난이도 상관없이)부터 최근 시즌까지 중, 고른 난이도(전체/하드/노말)로 1번이라도 공격한 시즌 수
+const DIFF_OF = { hard: 2, normal: 1 };
+function participation(g, m, diff = b.diff) {
     const roster = b.members[g]?.list || [];
     const ids = new Set(roster.map((x) => x.id));
     const seasons = (b.raids[g] || []).filter((r) => r.attacks?.some((a) => ids.has(a.openid))) // 다른 유니온 기록이 잘못 저장된 시즌은 뺌
         .sort((x, y) => Number(y.season) - Number(x.season));
     if (!seasons.length) return null;
-    const hit = seasons.map((r) => r.attacks.some((a) => a.openid === m.id));
+    const mine = (r, want) => r.attacks.some((a) => a.openid === m.id && (!want || a.diff === want));
+    const any = seasons.map((r) => mine(r));
     // 가입한 시즌은 알 수 없어서 처음 공격한 시즌부터 셈 (한 번도 공격 안 했으면 최근 1시즌)
-    const span = hit.lastIndexOf(true) + 1 || 1;
-    const n = hit.slice(0, span).filter(Boolean).length;
-    return { n, span, rate: n / span, last: hit[0] };
+    const span = any.lastIndexOf(true) + 1 || 1;
+    const count = (want) => seasons.slice(0, span).filter((r) => mine(r, want)).length;
+    const want = DIFF_OF[diff] || 0;
+    const n = count(want);
+    return { n, span, rate: n / span, last: mine(seasons[0], want), hard: count(2), normal: count(1) };
 }
 function partCell(p) {
     if (!p) return `<span class="dim">-</span>`;
     const cls = p.rate >= 0.8 ? "good" : p.rate >= 0.5 ? "warn-num" : "bad";
-    return `<b class="${cls}">${p.n}/${p.span}</b> <small class="muted">${Math.round(p.rate * 100)}%</small>${p.last ? "" : ` <small class="bad">이번 ✕</small>`}`;
+    return `<b class="${cls}">${p.n}/${p.span}</b> <small class="muted">${Math.round(p.rate * 100)}%</small>${p.last ? "" : ` <small class="bad">이번 ✕</small>`}`
+        + (b.diff === "all" && p.n ? `<div class="muted small">하드 ${p.hard} · 노말 ${p.normal}</div>` : "");
 }
 
 // 고정 가입 순서 (data/join-order.json, 유니온 이름별 [UID, 닉네임] 목록)에서 이 멤버의 자리
@@ -133,7 +138,7 @@ function split(g) {
     // 가입순: 엑셀 줄 순서(예전 기록지는 위가 먼저 가입) → 엑셀 이후 들어온 사람은 가입일 → 기록 없는 사람은 맨 뒤
     const joinKey = (x) => { const i = fixedIndex(g, x.m, x.e); return [i >= 0 ? i + 1 : x.e?.order ?? Infinity, x.e?.joinDate || "9999", x.m.nick]; };
     const cmp = (a, c) => { const p = joinKey(a), q = joinKey(c); return p[0] - q[0] || p[1].localeCompare(q[1]) || p[2].localeCompare(q[2], "ko"); };
-    if (b.sort === "part") current.sort((a, c) => (participation(g, a.m, a.e)?.rate ?? 2) - (participation(g, c.m, c.e)?.rate ?? 2));
+    if (b.sort === "part") current.sort((a, c) => (participation(g, a.m)?.rate ?? 2) - (participation(g, c.m)?.rate ?? 2));
     else if (b.sort === "synchro") current.sort((a, c) => (c.m.synchro || 0) - (a.m.synchro || 0));
     else if (b.sort === "name") current.sort((a, c) => a.m.nick.localeCompare(c.m.nick, "ko"));
     else current.sort(cmp);
@@ -167,10 +172,10 @@ function render() {
         <p class="muted">멤버 목록 ${fetched ? `${new Date(fetched).toLocaleDateString("ko-KR")} 기준 · ` : ""}유니온 레이드 탭에서 「멤버 목록 갱신」을 누르면 새로 들어오거나 나간 사람이 자동으로 기록됩니다. 줄을 누르면 수정합니다.</p>
         <h3 class="sec">지금 멤버 <small class="muted">${roster.length}명</small>
             <select id="rb-sort" class="rb-sort">${[["join", "가입순"], ["part", "참여율 낮은 순"], ["synchro", "싱크로 높은 순"], ["name", "이름순"]].map(([k, l]) => `<option value="${k}" ${b.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></h3>
-        ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>레이드 참여<br><small>참여 시즌 / 가입 후 시즌</small></th><th>메모</th></tr></thead><tbody>
+        ${roster.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>#</th><th>닉네임</th><th>UID</th><th>가입일</th><th>가입 당시<br><small>지휘관 Lv / 싱크로</small></th><th>가입 당시<br><small>캠페인 · 타워</small></th><th>지금<br><small>지휘관 Lv / 싱크로</small></th><th>레이드 참여 <select id="rb-diff" class="rb-sort">${[["all", "전체"], ["hard", "하드"], ["normal", "노말"]].map(([k, l]) => `<option value="${k}" ${b.diff === k ? "selected" : ""}>${l}</option>`).join("")}</select><br><small>참여 시즌 / 처음 공격 뒤 시즌</small></th><th>메모</th></tr></thead><tbody>
             ${current.map(({ m, e }, i) => `<tr data-member="${esc(m.id)}"><td class="muted">${i + 1}</td><td>${nickCell(e, m)}</td><td>${esc(e?.uid || rawUid(m)) || `<span class="dim">-</span>`}</td>
                 <td>${joinCell(e)}</td><td>${lvCell(e?.joinLevel, e?.joinSynchro)}</td><td>${campCell(e)}</td>
-                <td>${lvCell(m.level, m.synchro)}</td><td>${partCell(participation(g, m, e))}</td><td class="rb-memo">${esc(e?.memo || "")}</td></tr>`).join("")}
+                <td>${lvCell(m.level, m.synchro)}</td><td>${partCell(participation(g, m))}</td><td class="rb-memo">${esc(e?.memo || "")}</td></tr>`).join("")}
         </tbody></table></div>` : `<p class="muted">멤버 목록이 아직 없습니다. 유니온 레이드 탭에서 「멤버 목록 갱신」을 눌러 주세요.</p>`}
         <h3 class="sec">나간 멤버 <small class="muted">${gone.length}명</small></h3>
         ${gone.length ? `<div class="table-wrap"><table class="stats rb-table"><thead><tr><th>닉네임</th><th>UID</th><th>가입일</th><th>나간 날</th><th>구분</th><th>사유</th><th>메모</th></tr></thead><tbody>
@@ -366,7 +371,10 @@ async function setup() {
         if (key) openEdit(b.books[b.current].entries.find((x) => x.key === key));
     });
     $("#rb-add").addEventListener("click", () => openEdit(null, null));
-    $("#rb-view").addEventListener("change", (e) => { if (e.target.id === "rb-sort") { b.sort = e.target.value; localStorage.setItem("hub_rb_sort", b.sort); render(); } });
+    $("#rb-view").addEventListener("change", (e) => {
+        if (e.target.id === "rb-sort") { b.sort = e.target.value; localStorage.setItem("hub_rb_sort", b.sort); render(); }
+        if (e.target.id === "rb-diff") { b.diff = e.target.value; localStorage.setItem("hub_rb_diff", b.diff); render(); }
+    });
     $("#rb-import").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) runImport(f); });
     $("#rb-form").addEventListener("submit", saveEdit);
     $("#rb-delete").addEventListener("click", removeEdit);
