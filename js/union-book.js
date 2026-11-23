@@ -15,7 +15,7 @@ const today = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0
 const md = (d) => (d ? d.slice(2).replace(/-/g, ".") : "");
 const daysSince = (d) => (d ? Math.floor((Date.parse(today()) - Date.parse(d)) / 86400000) : null);
 
-const b = { info: null, members: {}, books: {}, raids: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
+const b = { info: null, members: {}, books: {}, raids: {}, fixed: {}, current: localStorage.getItem("hub_rb_guild") || "", editing: null, sort: localStorage.getItem("hub_rb_sort") || "join" };
 
 // ---------- 저장 ----------
 async function loadBook(g) {
@@ -91,6 +91,34 @@ function partCell(p) {
     return `<b class="${cls}">${p.n}/${p.span}</b> <small class="muted">${Math.round(p.rate * 100)}%</small>${p.last ? "" : ` <small class="bad">이번 ✕</small>`}`;
 }
 
+// 고정 가입 순서 (data/join-order.json, 유니온 이름별 [UID, 닉네임] 목록)에서 이 멤버의 자리
+const nickMatch = (a, c) => { a = squash(a).replace(/…$/, ""); c = squash(c).replace(/…$/, ""); return !!a && !!c && (a === c || a.startsWith(c) || c.startsWith(a)); };
+function fixedIndex(g, m, e) {
+    const list = b.fixed[squash(guildName(g))];
+    if (!list) return -1;
+    let i = e?.uid ? list.findIndex(([uid]) => uid === e.uid) : -1;
+    if (i < 0) i = list.findIndex(([, nick]) => [m?.nick, ...(e?.nicks || [])].some((n) => n && nickMatch(n, nick)));
+    return i;
+}
+
+// 고정 순서에 있는 지금 멤버는 기록에 UID와 순서를 저장해 둠 (닉네임이 바뀌어도 UID로 이어지게)
+function applyFixed(g) {
+    const book = b.books[g];
+    const list = b.fixed[squash(guildName(g))];
+    if (!book || !list) return false;
+    let changed = false;
+    for (const m of b.members[g]?.list || []) {
+        let e = findById(book, m.id) || book.entries.find((x) => !x.left && (x.nicks || []).some((n) => nickMatch(n, m.nick)));
+        const i = fixedIndex(g, m, e);
+        if (i < 0) continue;
+        if (!e) { e = { key: newKey(), id: m.id, uid: "", nicks: [m.nick], joinDate: "", joinLevel: "", joinSynchro: "", joinCampaign: "", joinExtra: "", memo: "", left: null, src: "excel" }; book.entries.push(e); changed = true; }
+        if (!e.id) { e.id = m.id; changed = true; }
+        if (!e.uid) { e.uid = list[i][0]; changed = true; }
+        if (e.order !== i + 1) { e.order = i + 1; changed = true; }
+    }
+    return changed;
+}
+
 function split(g) {
     const book = b.books[g] || { entries: [] };
     const roster = b.members[g]?.list || [];
@@ -103,7 +131,7 @@ function split(g) {
     const gone = book.entries.filter((e) => !used.has(e) && (e.left || roster.length)).map((e) => ({ e, unknown: !e.left }));
     gone.sort((x, y) => (y.e.left?.date || "").localeCompare(x.e.left?.date || ""));
     // 가입순: 엑셀 줄 순서(예전 기록지는 위가 먼저 가입) → 엑셀 이후 들어온 사람은 가입일 → 기록 없는 사람은 맨 뒤
-    const joinKey = (x) => [x.e?.order ?? Infinity, x.e?.joinDate || "9999", x.m.nick];
+    const joinKey = (x) => { const i = fixedIndex(g, x.m, x.e); return [i >= 0 ? i + 1 : x.e?.order ?? Infinity, x.e?.joinDate || "9999", x.m.nick]; };
     const cmp = (a, c) => { const p = joinKey(a), q = joinKey(c); return p[0] - q[0] || p[1].localeCompare(q[1]) || p[2].localeCompare(q[2], "ko"); };
     if (b.sort === "part") current.sort((a, c) => (participation(g, a.m, a.e)?.rate ?? 2) - (participation(g, c.m, c.e)?.rate ?? 2));
     else if (b.sort === "synchro") current.sort((a, c) => (c.m.synchro || 0) - (a.m.synchro || 0));
@@ -302,6 +330,10 @@ async function setup() {
     memberSnap.forEach((d) => (b.members[d.id] = JSON.parse(d.data().data)));
     bookSnap.forEach((d) => (b.books[d.id] = JSON.parse(d.data().data)));
     raidSnap.forEach((d) => { const x = JSON.parse(d.data().data); (b.raids[x.guild] ||= []).push(x); });
+    try {
+        const fixed = await (await fetch("data/join-order.json")).json();
+        for (const [name, list] of Object.entries(fixed)) if (!name.startsWith("_")) b.fixed[squash(name)] = list;
+    } catch {}
     // 예전 버전이 블라블라 값으로 잘못 넣은 UID 정리: 한 유니온에서 같은 UID가 3명 이상이면 그 UID는 비움
     for (const [g, book] of Object.entries(b.books)) {
         const count = {};
@@ -315,7 +347,10 @@ async function setup() {
         if (bad.length) for (const e of book.entries) if (bad.includes(e.uid)) e.uid = "";
         if (bad.length || badDays.length) saveBook(g).catch(() => {});
     }
-    for (const g of guildIds()) b.books[g] ||= { entries: [] };
+    for (const g of guildIds()) {
+        b.books[g] ||= { entries: [] };
+        if (applyFixed(g)) saveBook(g).catch(() => {});
+    }
 
     $("#rb-subtabs").addEventListener("click", (e) => {
         const g = e.target.dataset.guild;
