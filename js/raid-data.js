@@ -6,7 +6,7 @@ import { db } from "./store.js";
 // { kind: "solo"|"coop", season: 숫자|null, boss, bossEn, element, start: "YYYY-MM-DD", end, deck, note, legacy, edited,
 //   results: { 계정: { runs: [{ score: 숫자, pct: 숫자|null, deck: [name_code ×5], decks: ["code,code,…" ×5] }], memo, pctFinal: true|false|없음 } } }
 // deck = 첫 번째 덱(협동 작전은 이것만), decks = 솔로 레이드 덱 5개 (Firestore는 배열 안의 배열을 못 넣어서 덱마다 쉼표 문자열)
-// pctFinal: 상위 %가 시즌 정산 뒤 확정된 값인지 (시즌이 끝난 레이드는 체크와 상관없이 확정으로 봄)
+// pctFinal: 상위 %가 시즌 정산 뒤 확정된 값인지. 직접 체크해야 확정 (확정 정보가 없는 예전 기록만 시즌이 끝났으면 확정으로 봄)
 
 export const KIND = { solo: "솔로 레이드", coop: "협동 작전" };
 
@@ -57,8 +57,8 @@ export function raidEnded(raid, all = []) {
     if (all.some((o) => o !== raid && o.kind === raid?.kind && ((o.start && raid.start && o.start > raid.start) || (o.season != null && raid.season != null && o.season > raid.season)))) return true;
     return !raid?.start && !raid?.end; // 날짜가 하나도 없는 예전 기록
 }
-// 확정: 시즌이 끝났거나 「% 확정」을 체크한 경우. 진행 중이고 체크 안 했으면 잠정
-export const isPctFinal = (raid, res, all = []) => !!res?.pctFinal || raidEnded(raid, all);
+// 확정: 「% 확정」을 체크한 경우. 이 기능 전에 넣어 확정 정보가 없는 기록은 시즌이 끝났으면 확정
+export const isPctFinal = (raid, res, all = []) => (res?.pctFinal != null ? !!res.pctFinal : raidEnded(raid, all));
 export const parseScore = (s) => Number(String(s ?? "").replace(/[^0-9]/g, "")) || 0;
 export const parsePct = (s) => { const v = parseFloat(String(s ?? "").replace(/[^0-9.]/g, "")); return Number.isFinite(v) ? v : null; };
 

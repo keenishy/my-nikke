@@ -300,7 +300,7 @@ function openEdit(raid) {
         const res = raid?.results?.[a];
         const runs = res?.runs?.length ? res.runs : [{}];
         return `<div class="racc" data-acc="${esc(a)}"><div class="racc-head"><b>${esc(a)}</b>
-            <label class="pct-final" title="시즌 정산 뒤 최종 순위로 확정된 %면 체크"><input type="checkbox" class="pfinal" ${res?.pctFinal || (raid && raidEnded(raid, r.raids)) ? "checked" : ""}>% 확정</label>
+            <label class="pct-final" title="시즌 정산 뒤 최종 순위로 확정된 %면 체크"><input type="checkbox" class="pfinal" ${(res?.pctFinal ?? (res && raid && raidEnded(raid, r.raids))) ? "checked" : ""}>% 확정</label>
             <button type="button" class="btn small" data-addrun>+ 회차</button></div>
             <div class="runs">${runs.map(runRow).join("")}</div>
             <input class="memo" placeholder="${esc(a)} 메모" value="${esc(res?.memo || "")}"></div>`;
